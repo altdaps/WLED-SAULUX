@@ -6,6 +6,19 @@
 namespace {
 bool lineTransitionActive = false;
 uint8_t lineBrightness = 255;
+uint8_t lineSegmentId = 0;
+bool lineFromStart = true, lineTargetOn = false;
+uint16_t lineStartLevel = 0;
+uint32_t lineStartedAt = 0, lineDuration = 0;
+
+// A fixed-point amount of white, independent of WLED's restartable transition blend.
+uint16_t lineLevelAt(uint32_t now) {
+  const uint16_t target = lineTargetOn ? UINT16_MAX : 0;
+  const uint32_t elapsed = now - lineStartedAt;
+  if (!lineDuration || elapsed >= lineDuration) return target;
+  const int32_t delta = int32_t(target) - lineStartLevel;
+  return lineStartLevel + int64_t(delta) * elapsed / lineDuration;
+}
 }
 
 // Keep the lit portion steady while the segment transitions between white and black.
@@ -15,6 +28,13 @@ uint8_t getSauluxLineBrightness(uint8_t brightness) {
 }
 void endSauluxLineTransition() { lineTransitionActive = false; }
 
+// Resolve once per rendered segment; the pixel loop only compares integer bounds.
+int getSauluxLineLitPixels(const Segment& segment, unsigned length) {
+  if (!lineTransitionActive || &segment != &strip.getSegment(lineSegmentId)) return -1;
+  return (uint32_t(lineLevelAt(millis())) * length + UINT16_MAX / 2) / UINT16_MAX;
+}
+bool isSauluxLineFromStart() { return lineFromStart; }
+
 // Expand an endpoint toggle into ordinary WLED state changes before deserialization.
 bool prepareSauluxLineToggle(JsonObject root) {
   const char* endpoint = root["sauluxLine"];
@@ -22,9 +42,21 @@ bool prepareSauluxLineToggle(JsonObject root) {
   const bool fromStart = strncmp(endpoint, "start", sizeof("start")) == 0;
   if (!fromStart && strncmp(endpoint, "end", sizeof("end")) != 0) return false;
   auto& segment = strip.getMainSegment();
-  // Consume presses during a curtain without queueing another toggle or restarting its timer.
-  if (lineTransitionActive || transitionActive || segment.isInTransition()) return false;
-  const bool turnOn = bri == 0 || !segment.on || segment.opacity == 0;
+#ifndef WLED_DISABLE_2D
+  if (segment.is2D()) return false;
+#endif
+  const bool continuing = lineTransitionActive && lineSegmentId == strip.getMainSegmentId();
+  if (!continuing && (transitionActive || segment.isInTransition())) return false;
+  const long fullTime = root["tt"] | (root["transition"] | long(transitionDelay / 100));
+  if (fullTime < 0 || fullTime > 655) return false; // WLED transition durations are uint16_t milliseconds
+  const uint32_t now = millis();
+  const bool turnOn = continuing ? !lineTargetOn : bri == 0 || !segment.on || segment.opacity == 0;
+  const uint16_t level = continuing ? lineLevelAt(now) : (turnOn ? 0 : UINT16_MAX);
+  const uint32_t distance = turnOn ? UINT16_MAX - level : level;
+  const uint32_t duration = (uint32_t(fullTime) * 100 * distance + UINT16_MAX / 2) / UINT16_MAX;
+  // A mid-pass press keeps the existing white anchor; moving it to the other end
+  // would replace the illuminated pixels rather than reverse their boundary.
+  const bool anchor = continuing ? lineFromStart : fromStart;
   const bool whiteChannel = segment.getLightCapabilities() & 2;
   JsonObject target = root.createNestedObject("seg");
   if (target.isNull()) return false;
@@ -41,7 +73,7 @@ bool prepareSauluxLineToggle(JsonObject root) {
   JsonArray white = colors.createNestedArray();
   if (white.isNull()) return false;
   for (uint8_t channel = 0; channel < 4; channel++) {
-    if (!white.add(turnOn && (whiteChannel ? channel == 3 : channel < 3) ? 255 : 0)) return false;
+    if (!white.add((whiteChannel ? channel == 3 : channel < 3) ? 255 : 0)) return false;
   }
   for (uint8_t color = 1; color < 3; color++) {
     JsonArray black = colors.createNestedArray();
@@ -49,19 +81,18 @@ bool prepareSauluxLineToggle(JsonObject root) {
   }
   // Switching off runs the curtain back towards the endpoint that was pressed.
   if (!root["on"].set(turnOn)) return false;
-  if (!root["bs"].set(fromStart == turnOn ? TRANSITION_SWIPE_RIGHT : TRANSITION_SWIPE_LEFT)) return false;
+  if (!root["bs"].set(anchor == turnOn ? TRANSITION_SWIPE_RIGHT : TRANSITION_SWIPE_LEFT)) return false;
   if (!root["nl"]["on"].set(false)) return false;
-  // A boot/off preset may leave white in the hidden buffer. Capture black as the
-  // old scene before restoring master power, so the first ON frame cannot flash.
-  if (turnOn) {
-    strip.suspend();
-    strip.waitForIt();
-    segment.colors[0] = 0;
-    segment.on = true;
-    segment.opacity = 255;
-    strip.resume();
-  }
-  lineBrightness = bri ? bri : briLast;
+  // Round the master timer up to 100 ms; the boundary itself uses the exact travel
+  // time so its speed stays constant even after several reversals near an endpoint.
+  if (!root["tt"].set((duration + 99) / 100)) return false;
+  if (!continuing) lineBrightness = bri ? bri : briLast;
+  lineSegmentId = strip.getMainSegmentId();
+  lineFromStart = anchor;
+  lineTargetOn = turnOn;
+  lineStartLevel = level;
+  lineStartedAt = now;
+  lineDuration = duration;
   lineTransitionActive = true;
   return true;
 }

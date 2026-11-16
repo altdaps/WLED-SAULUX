@@ -9,18 +9,22 @@ inline bool realtimeOverride = false, realtimeMode = false, arlsForceMaxBri = fa
 inline uint32_t transitionStartTime = 0;
 inline unsigned transitionDelay = 2000, interfaceUpdateCallMode = 0;
 void updateInterfaces(unsigned) {}
-struct LineSegment {
+class Segment {
+public:
   bool on = true, transitioning = false;
   uint8_t opacity = 255, caps = 3;
   uint32_t colors[3] = {0xff000000, 0, 0};
   uint8_t getLightCapabilities() const { return caps; }
   bool isInTransition() const { return transitioning; }
+  bool is2D() const { return false; }
 };
+using LineSegment = Segment;
 inline struct LineStrip {
-  LineSegment segment;
+  LineSegment segment, other;
   unsigned duration = 2000;
   uint8_t brightness = 0;
   LineSegment& getMainSegment() { return segment; }
+  LineSegment& getSegment(uint8_t id) { return id == 0 ? segment : other; }
   uint8_t getMainSegmentId() const { return 0; }
   void suspend() {} void waitForIt() {} void resume() {} void trigger() {}
   void setBrightness(uint8_t b) { brightness = b; }
@@ -52,38 +56,77 @@ void checkCurtain(const char* endpoint, bool wasOn, uint32_t start) {
   assert(root["bs"] == (right ? 2 : 3));
   assert(root["seg"]["id"] == 0 && root["seg"]["fx"] == 0);
   assert(root["seg"]["on"] == true && root["seg"]["rev"] == false);
-  assert(root["seg"]["col"][0][3] == (wasOn ? 0 : 255));
+  assert(root["seg"]["col"][0][3] == 255);
   assert(root["seg"]["col"][0][0] == 0);
   assert(root["nl"]["on"] == false);
-  if (!wasOn) assert(strip.segment.colors[0] == 0); // no white flash on master ON
   bri = wasOn ? 0 : briLast; transitionActive = true; jsonTransitionOnce = true;
   transitionStartTime = start; strip.duration = 2000; strip.segment.transitioning = true;
   for (uint32_t elapsed = 0; elapsed < 2000; elapsed += 25) {
     tick = start + elapsed;
     handleTransitions(); applyBri();
     assert(strip.brightness == 128); // no master fade, even on the very first frame
-    for (const char* other : {"start", "end"}) {
-      DynamicJsonDocument busy(4096); JsonObject request = busy.to<JsonObject>();
-      request["sauluxLine"] = other; request["tt"] = 300;
-      assert(!prepareSauluxLineToggle(request));
-      assert(request["on"].isNull() && request["seg"].isNull());
-      assert(transitionStartTime == start && strip.duration == 2000);
-    }
+    const unsigned level = (elapsed * UINT16_MAX) / 2000;
+    const unsigned expected = (uint32_t(wasOn ? UINT16_MAX - level : level) * 105 + UINT16_MAX / 2) / UINT16_MAX;
+    assert(getSauluxLineLitPixels(strip.segment, 105) == expected);
+    assert(getSauluxLineLitPixels(strip.other, 105) == -1);
+
   }
   tick = start + 2000; handleTransitions();
   assert(!transitionActive && !isSauluxLineTransition());
   assert(strip.brightness == bri && briOld == bri && briT == bri);
+  assert(getSauluxLineLitPixels(strip.segment, 105) == -1);
+}
+// Reverse either button from the current boundary, including several consecutive reversals.
+void checkReversals(const char* endpoint, const char* reverseButton, bool wasOn, unsigned elapsed, uint32_t start) {
+  endSauluxLineTransition(); transitionActive = false; strip.segment.transitioning = false;
+  bri = wasOn ? 128 : 0; briT = briOld = bri; tick = start;
+  DynamicJsonDocument doc(4096); JsonObject root = doc.to<JsonObject>();
+  root["sauluxLine"] = endpoint; root["tt"] = 20;
+  assert(prepareSauluxLineToggle(root));
+  const bool anchor = isSauluxLineFromStart();
+  bri = wasOn ? 0 : 128; transitionActive = true; strip.segment.transitioning = true;
+  tick = start + elapsed;
+  const int before = getSauluxLineLitPixels(strip.segment, 105);
+  DynamicJsonDocument reverseDoc(4096); JsonObject reverse = reverseDoc.to<JsonObject>();
+  reverse["sauluxLine"] = reverseButton; reverse["tt"] = 20;
+  assert(prepareSauluxLineToggle(reverse));
+  assert(reverse["on"] == wasOn);
+  assert(isSauluxLineFromStart() == anchor);
+  assert(getSauluxLineLitPixels(strip.segment, 105) == before); // exact positional continuity
+  assert(reverse["tt"].as<unsigned>() == (elapsed + 99) / 100);
+  assert(getSauluxLineBrightness(1) == 128);
+  tick += elapsed / 2;
+  const int returning = getSauluxLineLitPixels(strip.segment, 105);
+  assert(wasOn ? returning >= before : returning <= before);
+  DynamicJsonDocument againDoc(4096); JsonObject again = againDoc.to<JsonObject>();
+  again["sauluxLine"] = endpoint; again["tt"] = 20;
+  assert(prepareSauluxLineToggle(again));
+  assert(again["on"] == !wasOn && isSauluxLineFromStart() == anchor);
+  assert(getSauluxLineLitPixels(strip.segment, 105) == returning);
+  tick += 2000;
+  assert(getSauluxLineLitPixels(strip.segment, 105) == (wasOn ? 0 : 105));
+  endSauluxLineTransition(); transitionActive = false; strip.segment.transitioning = false;
 }
 int main() {
   for (const char* endpoint : {"start", "end"}) for (bool wasOn : {false, true}) {
     checkCurtain(endpoint, wasOn, 1000);
     checkCurtain(endpoint, wasOn, UINT32_MAX - 500); // millis rollover
   }
+  for (const char* endpoint : {"start", "end"}) for (const char* reverseButton : {"start", "end"})
+    for (bool wasOn : {false, true}) for (unsigned elapsed : {100, 500, 1000, 1900}) {
+      checkReversals(endpoint, reverseButton, wasOn, elapsed, 1000);
+      checkReversals(endpoint, reverseButton, wasOn, elapsed, UINT32_MAX - 500);
+    }
   for (const char* invalid : {"", "left", "startx", "endx", "START"}) {
     DynamicJsonDocument doc(4096); JsonObject root = doc.to<JsonObject>();
     root["sauluxLine"] = invalid;
     assert(!prepareSauluxLineToggle(root));
     assert(root["on"].isNull() && root["seg"].isNull());
+  }
+  for (int duration : {-1, 656, 2147483647}) {
+    DynamicJsonDocument doc(4096); JsonObject root = doc.to<JsonObject>();
+    root["sauluxLine"] = "start"; root["tt"] = duration;
+    assert(!prepareSauluxLineToggle(root) && root["seg"].isNull());
   }
   for (bool segmentBusy : {false, true}) {
     transitionActive = !segmentBusy; strip.segment.transitioning = segmentBusy;
@@ -103,10 +146,10 @@ int main() {
   applyLinePreset(preset); // accepted, updates once inside deserialization
   DynamicJsonDocument busyDoc(4096); JsonObject busyPreset = busyDoc.to<JsonObject>();
   busyPreset["sauluxLine"] = "end";
-  applyLinePreset(busyPreset); // ignored; must skip the outer preset stateUpdated()
-  assert(acceptedPresetUpdates == 1 && genericPresetUpdates == 0 && releasedLocks == 2);
+  applyLinePreset(busyPreset); // reverse; still skip the outer preset stateUpdated()
+  assert(acceptedPresetUpdates == 2 && genericPresetUpdates == 0 && releasedLocks == 2);
   endSauluxLineTransition();
   assert(getSauluxLineBrightness(37) == 37); // ordinary brightness is unaffected
-  std::puts("Endpoint curtains, busy presses, steady brightness, completion and rollover passed");
+  std::puts("Endpoint curtains, continuous reversals, constant speed, brightness and rollover passed");
 }
 // AI: end
