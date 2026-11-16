@@ -377,9 +377,8 @@ bool deserializeState(JsonObject root, byte callMode, byte presetId)
   #endif
 
   bool onBefore = bri;
-  byte briBefore = bri;
   getVal(root["bri"], bri);
-  if (bri != briBefore) stateChanged = true; // compare to request start, not briOld (transition origin)
+  if (bri != briOld) stateChanged = true;
 
   bool on = root["on"] | (bri > 0);
   if (!on != !bri) toggleOnOff();
@@ -533,9 +532,7 @@ bool deserializeState(JsonObject root, byte callMode, byte presetId)
     if (root["win"].isNull() && getVal(root["ps"], presetCycCurr, 1, 250) && presetCycCurr > 0 && presetCycCurr < 251 && presetCycCurr != currentPreset) {
       DEBUG_PRINTF_P(PSTR("Preset select: %d\n"), presetCycCurr);
       // b) preset ID only or preset that does not change state (use embedded cycling limits if they exist in getVal())
-      // async load from file system (only preset ID was specified)
-      // avoid propogating CALL_MODE_INIT, which may cause accidental recursion
-      applyPreset(presetCycCurr, callMode == CALL_MODE_INIT ? CALL_MODE_DIRECT_CHANGE : callMode);
+      applyPreset(presetCycCurr, callMode); // async load from file system (only preset ID was specified)
       return stateResponse;
     } else presetCycCurr = currentPreset; // restore presetCycCurr
   }
@@ -720,14 +717,7 @@ void serializeInfo(JsonObject root)
 #ifdef SAULUX_OTA_BASE
   root["otaBase"] = F(SAULUX_OTA_BASE);
 #endif
-#if !defined(ARDUINO_ARCH_ESP32) || (ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)) // ToDO: verify that this works correctly in V5
   root[F("deviceId")] = getDeviceId();
-#else
-  //#if defined(ARDUINO_ARCH_ESP32) && !defined(WLED_DISABLE_OTA)
-  // fake 38char fingerprint from bootloaderSHA1. WARNING: only for testing, not suitable for production!
-  //root[F("deviceId")] = String("0000") + getBootloaderSHA256Hex().substring(4, 34) + String("0000");
-  //#endif
-#endif
 
   JsonObject leds = root.createNestedObject(F("leds"));
   leds[F("count")] = strip.getLengthTotal();
@@ -833,23 +823,12 @@ void serializeInfo(JsonObject root)
   int qrssi = WiFi.RSSI();
   wifi_info[F("rssi")] = qrssi;
   wifi_info[F("signal")] = getSignalQuality(qrssi);
-  int wifiChannel = WiFi.channel();
-  wifi_info[F("channel")] = wifiChannel;
-  if ((wifiChannel > 0) && (unsigned(WiFi.status()) < unsigned(WL_CONNECT_FAILED))) { // Wifi Status > 3 are error statuses (disconnected, stopped, signal lost)
-    #if defined(ARDUINO_ARCH_ESP32) && SOC_WIFI_SUPPORT_5G
-      auto wifiBand = WiFi.getBand();
-      wifi_info[F("band")] = wifiBand == WIFI_BAND_2G ? F("2.4GHz") : (wifiBand == WIFI_BAND_5G ? F("5GHz"): F("(other)"));
-    #else
-      wifi_info[F("band")] = F("2.4GHz");
-    #endif
-  } else {
-    wifi_info[F("band")] = F("not connected");
-  }
+  wifi_info[F("channel")] = WiFi.channel();
   wifi_info[F("ap")] = apActive;
 
   JsonObject fs_info = root.createNestedObject("fs");
-  fs_info["u"] = getFsBytesUsed() / 1000;
-  fs_info["t"] = getFsBytesTotal() / 1000;
+  fs_info["u"] = fsBytesUsed / 1000;
+  fs_info["t"] = fsBytesTotal / 1000;
   fs_info[F("pmt")] = presetsModifiedTime;
 
   root[F("ndc")] = nodeListEnabled ? (int)Nodes.size() : -1;
@@ -896,7 +875,7 @@ void serializeInfo(JsonObject root)
   // Total PSRAM size in MB, round up to correct for allocator overhead
   root[F("psrSz")] = (ESP.getPsramSize() + (1024U * 1024U - 1)) / (1024U * 1024U); 
   #endif
-  root[F("uptime")] = millis()/1000 + getRolloverMillis()*4294967;
+  root[F("uptime")] = millis()/1000 + rolloverMillis*4294967;
 
   char time[32];
   getTimeString(time);
@@ -923,8 +902,6 @@ void serializeInfo(JsonObject root)
   #endif
   #ifndef WLED_DISABLE_FILESYSTEM
   os += 0x08;
-  #else
-    #error "WLED_DISABLE_FILESYSTEM is not supported any more"
   #endif
   #ifndef WLED_DISABLE_HUESYNC
   os += 0x04;
@@ -941,9 +918,9 @@ void serializeInfo(JsonObject root)
   root[F("product")] = F(WLED_PRODUCT_NAME);
   root["mac"] = escapedMac;
   char s[16] = "";
-  if (WLEDNetwork.isConnected())
+  if (Network.isConnected())
   {
-    IPAddress localIP = WLEDNetwork.localIP();
+    IPAddress localIP = Network.localIP();
     sprintf(s, "%d.%d.%d.%d", localIP[0], localIP[1], localIP[2], localIP[3]);
   }
   root["ip"] = s;
@@ -1073,9 +1050,6 @@ void serializeNetworks(JsonObject root)
 
   switch (status) {
     case WIFI_SCAN_FAILED:
-      #if defined(SOC_WIFI_SUPPORT_5G) && (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 2))
-      if (!WiFi.setBandMode(wifi_band_mode_t(wifiBandMode))) { DEBUG_PRINTLN(F("serializeNetworks(): WiFi band configuration failed!")); }
-      #endif
       WiFi.scanNetworks(true);
       return;
     case WIFI_SCAN_RUNNING:
@@ -1160,21 +1134,6 @@ void serializePins(JsonObject root)
     #elif defined(CONFIG_IDF_TARGET_ESP32) // ESP32 classic
     if (gpio == 0) caps |= PIN_CAP_BOOT; // pull low to enter bootloader mode
     if (gpio == 2 || gpio == 12) caps |= PIN_CAP_BOOTSTRAP; // note: if GPIO12 must be low at boot, (high=1.8V flash mode), GPIO 2 must be low or floating to enter bootloader mode
-    #elif defined(CONFIG_IDF_TARGET_ESP32C5)
-    if (gpio == 28) caps |= PIN_CAP_BOOT;  // pull low to enter bootloader mode
-    if (gpio == 27) caps |= PIN_CAP_BOOTSTRAP; // must be high when GPIO28 is low for download mode
-    if (gpio == 2 || gpio == 3 || gpio == 7 || gpio == 25 || gpio == 26) caps |= PIN_CAP_BOOTSTRAP; // additional C5 strapping pins per Espressif boot configuration docs
-    #elif defined(CONFIG_IDF_TARGET_ESP32C6)
-    if (gpio == 9) caps |= PIN_CAP_BOOT;   // pull low to enter bootloader mode
-    if (gpio == 8) caps |= PIN_CAP_BOOTSTRAP; // must be high when GPIO9 is low for download mode
-    if (gpio == 4 || gpio == 5 || gpio == 15) caps |= PIN_CAP_BOOTSTRAP; // additional C6 strapping pins per Espressif strapping-pin docs
-    #elif defined(CONFIG_IDF_TARGET_ESP32C61)
-    if (gpio == 9) caps |= PIN_CAP_BOOT;   // pull low to enter bootloader mode
-    if (gpio == 8) caps |= PIN_CAP_BOOTSTRAP; // must be high when GPIO9 is low for download mode
-    if (gpio == 7 || gpio == 3 || gpio == 4) caps |= PIN_CAP_BOOTSTRAP; //  GPIO7, MTMS, and MTDI are also strapping pins
-    #elif defined(CONFIG_IDF_TARGET_ESP32P4)
-    if (gpio == 35) caps |= PIN_CAP_BOOT;  // pull low to enter bootloader mode
-    if (gpio == 36) caps |= PIN_CAP_BOOTSTRAP; // must be high when GPIO35 is low for download mode    
     #endif
     #else
     // ESP8266: GPIO 0-16 + GPIO17=A0

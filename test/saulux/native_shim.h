@@ -32,7 +32,7 @@ inline void pinMode(int, int) {}
 inline struct NetworkStub {
   bool connected = false;
   bool isConnected() const { return connected; }
-} WLEDNetwork;
+} Network;
 namespace UsermodManager {
 inline bool complete = true;
 inline unsigned reads = 0;

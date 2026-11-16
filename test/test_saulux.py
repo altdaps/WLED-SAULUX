@@ -39,15 +39,33 @@ class ProfileTests(unittest.TestCase):
                                     "-o", str(binary)], check=True)
                     subprocess.run([str(binary)], check=True)
 
+    def test_native_ota_validation(self):
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        self.assertIsNotNone(compiler, "A host C++ compiler is required")
+        with tempfile.TemporaryDirectory() as folder:
+            temp = Path(folder)
+            source = (ROOT / "wled00/wled_metadata.cpp").read_text()
+            (temp / "ota_validation.cpp").write_text(source[source.index("static String normalizeReleaseName"):])
+            (temp / "WString.h").touch()
+            binary = temp / "ota"
+            # Pattern-filled locals make accidental reads of unused name-buffer bytes reproducible.
+            subprocess.run([compiler, "-std=c++17", "-ftrivial-auto-var-init=pattern",
+                            "-I" + str(temp), "-I" + str(ROOT / "wled00"),
+                            str(ROOT / "test/saulux/ota_native.cpp"), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
 
 class ReleaseTests(unittest.TestCase):
     def test_prepare_rejects_invalid_tags(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            (root / "package.json").write_text('{"version":"old"}')
+            (root / "package.json").write_text('{"version":"1.2.3"}')
             for tag in ("v1.0.0", "saulux-v1", "saulux-v1.0.0/evil", "saulux-v1.0.0\n"):
                 with self.assertRaises(ValueError):
                     release.prepare(tag, root)
+            with self.assertRaises(ValueError):
+                release.prepare("saulux-v17.0.0-saulux.8", root)
+            self.assertEqual(json.loads((root / "package.json").read_text())["version"], "1.2.3")
             self.assertEqual(release.prepare("saulux-v1.2.3-rc.1", root), "1.2.3-rc.1")
             self.assertEqual(json.loads((root / "package.json").read_text())["version"], "1.2.3-rc.1")
 

@@ -31,7 +31,7 @@ jobs:
         uses: janheinrichmerker/action-github-changelog-generator@v2.4
         with:
           token: ${{ secrets.GITHUB_TOKEN }} 
-          sinceTag: v16.0.0
+          sinceTag: v0.15.0
           output: CHANGELOG_NIGHTLY.md
           # Exclude issues that were closed without resolution from changelog
           excludeLabels: 'stale,wontfix,duplicate,invalid,external,question,use-as-is,not_planned'
@@ -41,7 +41,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: nightly
-          name: 'Development Nightly (unstable) Build $$'
+          name: 'Nightly Release $$'
           prerelease: true
           body_path: CHANGELOG_NIGHTLY.md
           files: |

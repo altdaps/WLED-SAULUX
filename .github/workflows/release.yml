@@ -59,7 +59,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           gh release create "$RELEASE_TAG" dist/*.bin dist/SHA256SUMS dist/manifest.json \
-            --verify-tag --title "$RELEASE_TAG" --generate-notes --latest
+            --verify-tag --title "$RELEASE_TAG" --notes-file .github/saulux-release-notes.md --latest
       - name: Upload OTA site
         uses: actions/upload-pages-artifact@v3
         with:

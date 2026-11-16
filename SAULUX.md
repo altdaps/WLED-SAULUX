@@ -1,4 +1,9 @@
-# SAULUX firmware
+# SAULUX firmware — WLED 16.0.1
+
+The firmware base is the official **WLED v16.0.1** tag
+(`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
+platform. SAULUX features are ported onto that source; WLED 17 development changes
+are not included. Fork releases use versions such as `16.0.1-saulux.1`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -70,7 +75,7 @@ correct electrical operation.
 
 ## Build locally
 
-Install Node.js 20+ and PlatformIO 6.1.19, then:
+Install Node.js 20+ and PlatformIO 6.1.17, then:
 
 ```sh
 npm ci
@@ -109,20 +114,26 @@ python3 -m esptool --chip esp32 --port /dev/ttyUSB0 write-flash 0x0 WLED_<versio
 ```
 
 Replace the serial port and filename. Factory images include the actual bootloader,
-partition table and application selected by PlatformIO. For a device already running
-upstream WLED, back up its configuration and presets first. A first manual OTA
-installation may require WLED's **Ignore firmware validation** checkbox because
-SAULUX has a different release name. Keep validation enabled for subsequent updates.
-When upgrading from universal versions `saulux.4`–`saulux.6`, manually upload the
-ordinary `.bin` for your board once. **Leave firmware validation enabled:** all three
-variants retain `SAULUX` as the firmware compatibility identifier. The earlier
-universal update page cannot select the new variant filenames automatically.
-If the saved applied profile matches the firmware, GPIO settings are retained.
-A different or unconfigured profile is replaced with this firmware's hardware defaults.
+partition table and application selected by PlatformIO.
 
-Earlier `saulux.1`–`saulux.3` builds use model-specific compatibility identifiers;
-their first manual upgrade to these variants may require **Ignore firmware validation**.
-Keep validation enabled after that transition.
+## Transition from SAULUX 17
+
+**The first transition from the previous `17.0.0-saulux.*` / ESP-IDF 5 images requires
+serial flashing of the matching 16.x factory image.** Save configuration and presets
+from the device's backup page first. This replaces the newer bootloader together
+with the application; uploading only the application by OTA is not a supported
+ESP-IDF downgrade. After serial installation, restore compatible settings/presets
+and verify LED lengths, GPIOs and effects on the board.
+
+The 16.x builds use the separate firmware compatibility identifier **`SAULUX_16`**.
+Normal firmware validation rejects direct OTA between the previous `SAULUX` family
+and this family. **Do not bypass this with Ignore firmware validation.** Normal
+validation remains enabled for subsequent 16.x Auto updates from this repository.
+The three OTA asset filenames still identify the hardware model, as listed above.
+
+Ordinary OTA retains the installed partition table. A factory image written at
+`0x0` also includes a fresh OTA-selection record for a consistent first boot.
+See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp-idf/en/v5.2/esp32/api-guides/bootloader.html#bootloader-compatibility).
 
 ## GitHub Actions releases and OTA
 
@@ -132,11 +143,11 @@ Keep validation enabled after that transition.
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v17.0.0-saulux.8
-   git push origin saulux-v17.0.0-saulux.8
+   git tag saulux-v16.0.1-saulux.1
+   git push origin saulux-v16.0.1-saulux.1
    ```
 
-The tag suffix (`17.0.0-saulux.8` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.1` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
@@ -153,9 +164,9 @@ needed on the browser; the ESP32 itself does not need outbound internet access.
 Normal firmware validation stays enabled. Interrupted/failed downloads are not uploaded.
 
 Each board downloads the application matching its compiled hardware variant, exposed
-as `otaRelease` in `/json/info`. The shared `release: "SAULUX"` field keeps normal
-firmware validation compatible across all three variants and the earlier universal
-build. Saved or restored model fields cannot redirect OTA to another variant.
+as `otaRelease` in `/json/info`. The shared `release: "SAULUX_16"` field enables normal
+firmware validation across these three 16.x variants while separating them from
+the previous ESP-IDF 5 family. Saved or restored model fields cannot redirect OTA to another variant.
 No firmware is downloaded from the upstream repository or the WLED proxy in SAULUX
 builds. Inherited upstream nightly publishing is disabled in this fork.
 
@@ -184,7 +195,8 @@ Host tests exercise the actual SAULUX implementation with hardware shims: all GP
 maps for each fixed variant, migration from other profiles, retained settings, input
 validation and delayed reboot.
 Updater tests cover matching variants, missing images, failed requests and truncated
-downloads. Successful compilation checks the real ESP32 interfaces. Flashing, relay
+downloads. Native OTA validation tests cover family separation, valid names and
+unterminated names. Successful compilation checks the real ESP32 interfaces. Flashing, relay
 polarity, input behavior and Ethernet link operation must be tested on the boards.
 
 References: [WLED Ethernet profiles](wled00/network.cpp),

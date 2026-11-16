@@ -20,6 +20,9 @@ def prepare(tag, root=Path(".")):
         raise ValueError("Expected tag saulux-vX.Y.Z (optional prerelease suffix)")
     package_file = root / "package.json"
     package = json.loads(package_file.read_text())
+    # A fork tag must retain the upstream version of the source being built.
+    if match[1].split("-")[0] != package["version"].split("-")[0]:
+        raise ValueError("Release tag must match the upstream version in package.json")
     package["version"] = match[1]
     package_file.write_text(json.dumps(package, indent=2) + "\n")
     return match[1]

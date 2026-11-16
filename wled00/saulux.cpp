@@ -175,7 +175,7 @@ void setupSauluxStatus() {
 // Blink faster when connected, slowly in AP mode, and turn off when disconnected.
 void handleSauluxStatus() {
   if (statusPin < 0) return;
-  const uint32_t interval = WLEDNetwork.isConnected() ? 500 : apActive ? 1000 : 0;
+  const uint32_t interval = Network.isConnected() ? 500 : apActive ? 1000 : 0;
   if (!interval) statusOn = false;
   else if (millis() - statusChanged >= interval) {
     statusChanged = millis();

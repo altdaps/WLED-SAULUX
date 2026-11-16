@@ -71,33 +71,29 @@ void WS2812FX::setUpMatrix() {
       // allowed values are: -1 (missing pixel/no LED attached), 0 (inactive/unused pixel), 1 (active/used pixel)
       char    fileName[32]; strcpy_P(fileName, PSTR("/2d-gaps.json"));
       bool    isFile = WLED_FS.exists(fileName);
+      size_t  gapSize = 0;
       int8_t *gapTable = nullptr;
 
-      if (isFile) {
+      if (isFile && requestJSONBufferLock(JSON_LOCK_LEDGAP)) {
         DEBUG_PRINT(F("Reading LED gap from "));
         DEBUG_PRINTLN(fileName);
-        // read the gap array directly from the file, a file with fewer entries than matrix positions is ignored
-        // the array is similar to ledmap, except it has only 3 values:
-        // -1 ... missing pixel (do not increase pixel count)
-        //  0 ... inactive pixel (it does count, but should be mapped out (-1))
-        //  1 ... active pixel (it will count and will be mapped)
-        File f = WLED_FS.open(fileName, "r");
-        if (f) {
-          gapTable = static_cast<int8_t*>(p_malloc(matrixSize));
-          if (gapTable) {
-            int value;
-            unsigned count = 0;
-            while (count < matrixSize && readNextIntFromFile(f, value)) {
-              gapTable[count++] = (int8_t)constrain(value, -1, 1);
-            }
-            if (count < matrixSize) { // incomplete gap file, ignore it so below loop does not read OOB
-              p_free(gapTable);
-              gapTable = nullptr;
+        // read the array into global JSON buffer
+        if (readObjectFromFile(fileName, nullptr, pDoc)) {
+          // the array is similar to ledmap, except it has only 3 values:
+          // -1 ... missing pixel (do not increase pixel count)
+          //  0 ... inactive pixel (it does count, but should be mapped out (-1))
+          //  1 ... active pixel (it will count and will be mapped)
+          JsonArray map = pDoc->as<JsonArray>();
+          gapSize = map.size();
+          if (!map.isNull() && gapSize >= matrixSize) { // not an empty map
+            gapTable = static_cast<int8_t*>(p_malloc(gapSize));
+            if (gapTable) for (size_t i = 0; i < gapSize; i++) {
+              gapTable[i] = constrain(map[i], -1, 1);
             }
           }
-          f.close();
         }
         DEBUG_PRINTLN(F("Gaps loaded."));
+        releaseJSONBufferLock();
       }
 
       unsigned x, y, pix=0; //pixel
@@ -152,40 +148,39 @@ void WS2812FX::setUpMatrix() {
 #ifndef WLED_DISABLE_2D
 // pixel is clipped if it falls outside clipping range
 // if clipping start > stop the clipping range is inverted
-bool Segment::isPixelXYClipped(int x, int y, uint8_t style) const {
-  if (style != TRANSITION_FADE && isInTransition() && _clipStart != _clipStop) {
+bool Segment::isPixelXYClipped(int x, int y) const {
+  if (blendingStyle != TRANSITION_FADE && isInTransition() && _clipStart != _clipStop) {
     const bool invertX = _clipStart  > _clipStop;
     const bool invertY = _clipStartY > _clipStopY;
     const int  cStartX = invertX ? _clipStop   : _clipStart;
     const int  cStopX  = invertX ? _clipStart  : _clipStop;
     const int  cStartY = invertY ? _clipStopY  : _clipStartY;
     const int  cStopY  = invertY ? _clipStartY : _clipStopY;
-    if (style == TRANSITION_FAIRY_DUST) {
+    if (blendingStyle == TRANSITION_FAIRY_DUST) {
       const unsigned width = cStopX - cStartX;          // assumes full segment width (faster than virtualWidth())
       const unsigned len = width * (cStopY - cStartY);  // assumes full segment height (faster than virtualHeight())
       if (len < 2) return false;
       const unsigned shuffled = hashInt(x + y * width) % len;
       const unsigned pos = (shuffled * 0xFFFFU) / len;
-      return spatialProgress() <= pos;
+      return progress() <= pos;
     }
-    if (style == TRANSITION_CIRCULAR_IN || style == TRANSITION_CIRCULAR_OUT) {
+    if (blendingStyle == TRANSITION_CIRCULAR_IN || blendingStyle == TRANSITION_CIRCULAR_OUT) {
       const int cx   = (cStopX-cStartX+1) / 2;
       const int cy   = (cStopY-cStartY+1) / 2;
-      const bool out = (style == TRANSITION_CIRCULAR_OUT);
-      unsigned prog = out ? spatialProgress() : invertProgress(spatialProgress());
+      const bool out = (blendingStyle == TRANSITION_CIRCULAR_OUT);
+      const unsigned prog = out ? progress() : 0xFFFFU - progress();
       int radius2    = max(cx, cy) * prog / 0xFFFF;
       radius2 = 2 * radius2 * radius2;
       if (radius2 == 0) return out;
       const int dx = x - cx;
       const int dy = y - cy;
       const bool outside = dx * dx + dy * dy > radius2;
-      const bool clip = out ? outside : !outside;
-      return clip;
+      return out ? outside : !outside;
     }
     bool xInside = (x >= cStartX && x < cStopX); if (invertX) xInside = !xInside;
     bool yInside = (y >= cStartY && y < cStopY); if (invertY) yInside = !yInside;
-    const bool notclipped = style == TRANSITION_OUTSIDE_IN ? xInside || yInside : xInside && yInside;
-    return !notclipped;
+    const bool clip = blendingStyle == TRANSITION_OUTSIDE_IN ? xInside || yInside : xInside && yInside;
+    return !clip;
   }
   return false;
 }
@@ -483,13 +478,13 @@ void Segment::drawCircle(uint16_t cx, uint16_t cy, uint8_t radius, uint32_t col,
         setPixelColorXY(cx + dx, cy + dy, col);
         setPixelColorXY(cx + dy, cy + dx, col);
     }
+      x++;
       if (d > 0) {
-        d += 4 * (x - y) + 10;
         y--;
+        d += 4 * (x - y) + 10;
       } else {
         d += 4 * x + 6;
       }
-      x++;
     }
   }
 }
@@ -502,10 +497,9 @@ void Segment::fillCircle(uint16_t cx, uint16_t cy, uint8_t radius, uint32_t col,
   // draw soft bounding circle
   if (soft) drawCircle(cx, cy, radius, col, soft);
   // fill it
-  int radius2 = soft ? radius * radius : radius * radius + radius;  // (r+0.5)^2 = r*r + r + 0.25; use exact radius for "soft" circle to stay compatible with Wu’s algorithm
   for (int y = -radius; y <= radius; y++) {
     for (int x = -radius; x <= radius; x++) {
-      if (x * x + y * y < radius2 &&
+      if (x * x + y * y <= radius * radius &&
           int(cx)+x >= 0 && int(cy)+y >= 0 &&
           int(cx)+x < vW && int(cy)+y < vH)
         setPixelColorXY(cx + x, cy + y, col);
