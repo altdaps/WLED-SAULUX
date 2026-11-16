@@ -20,17 +20,17 @@ function updater(fetch) {
 	const context = vm.createContext({fetch, console, File, DataTransfer: Transfer,
 		gId: field, toggle() {}, document: {querySelector: field}});
 	vm.runInContext(source, context);
-	context.deviceInfo = {repo: 'altdaps/WLED-SAULUX', release: 'SAULUX_5I4O', otaBase: 'https://altdaps.github.io/WLED-SAULUX'};
+	context.deviceInfo = {repo: 'altdaps/WLED-SAULUX', release: 'SAULUX', otaBase: 'https://altdaps.github.io/WLED-SAULUX'};
 	return {context, field, submitted: () => submitted};
 }
 
-test('OTA uses this fork and selects the matching compiled variant', async () => {
+test('OTA uses this fork and selects the universal firmware', async () => {
 	const urls = [];
-	const asset = {name: 'WLED_1.0.0_SAULUX_5I4O.bin', size: 3};
+	const asset = {name: 'WLED_1.0.0_SAULUX.bin', size: 3};
 	const app = updater(async url => {
 		urls.push(url);
 		return url.endsWith('manifest.json')
-			? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX_2I2O.bin', size: 3}, asset]})}
+			? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_ESP32.bin', size: 3}, asset]})}
 			: {ok: true, blob: async () => new Blob([Uint8Array.from([0xe9, 1, 2])])};
 	});
 	await app.context.autoUpdate();
@@ -39,8 +39,8 @@ test('OTA uses this fork and selects the matching compiled variant', async () =>
 	assert.equal(app.field('input[name="update"]').files[0].name, asset.name);
 });
 
-test('OTA refuses a missing variant and never uploads another device image', async () => {
-	const app = updater(async () => ({ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX_ETHERNET.bin'}]})}));
+test('OTA refuses a missing universal firmware and never uploads another image', async () => {
+	const app = updater(async () => ({ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_ESP32_Ethernet.bin'}]})}));
 	await app.context.autoUpdate();
 	assert.equal(app.submitted(), false);
 	assert.match(app.field('autoUpdStatus').textContent, /Firmware not found/);
@@ -48,7 +48,7 @@ test('OTA refuses a missing variant and never uploads another device image', asy
 
 test('OTA refuses truncated downloads', async () => {
 	const app = updater(async url => url.endsWith('manifest.json')
-		? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX_5I4O.bin', size: 100}]})}
+		? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX.bin', size: 100}]})}
 		: {ok: true, blob: async () => new Blob(['short'])});
 	await app.context.autoUpdate();
 	assert.equal(app.submitted(), false);

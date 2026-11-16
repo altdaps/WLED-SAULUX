@@ -10,6 +10,30 @@ static void freshPins() {
 }
 
 int main() {
+  // A fresh universal install must wait for model selection without claiming GPIOs.
+  {
+    freshPins();
+    DynamicJsonDocument document(16384);
+    JsonObject root = document.to<JsonObject>();
+    root["hw"]["relay"]["pin"] = 2; // An upstream/legacy config must not select a board implicitly.
+    assert(prepareSauluxConfig(root));
+    assert(getSauluxModel() == 0);
+    assert(root["hw"]["led"]["ins"].is<JsonArray>());
+    assert(root["hw"]["led"]["ins"].size() == 0);
+    assert(root["hw"]["btn"]["ins"].size() == 0);
+    assert(root["hw"]["relay"]["pin"] == -1);
+    assert(root["eth"]["type"] == 0);
+    assert(PinManager::allocated.empty());
+    serializeSauluxConfig(root);
+    assert(!prepareSauluxConfig(root));
+    assert(selectSauluxHardware("3", "1", false) == SauluxSelection::Changed);
+    serializeSauluxConfig(root);
+    assert(root["saulux"]["applied"] == 0);
+    freshPins();
+    assert(prepareSauluxConfig(root));
+    assert(getSauluxModel() == 3);
+    assert(root["hw"]["led"]["ins"][0]["pin"][0] == 16);
+  }
   const int expectedInputs[][5] = {{18,4,-1,-1,-1}, {27,26,25,33,32}, {32,33,-1,-1,-1}};
   const int expectedOutputs[][4] = {{17,16,-1,-1}, {18,19,21,22}, {16,-1,-1,-1}};
   const int expectedRelay[] = {2,12,-1};

@@ -8,7 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
-RELEASES = ("SAULUX_2I2O", "SAULUX_5I4O", "SAULUX_ETHERNET")
+RELEASES = ("SAULUX",)
 OTA_BASE = "https://altdaps.github.io/WLED-SAULUX"
 MAX_FIRMWARE_SIZE = 0x180000
 

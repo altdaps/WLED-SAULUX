@@ -186,6 +186,7 @@ void handleSettingsSet(AsyncWebServerRequest *request, byte subPage)
         configNeedsWrite = true;
         return;
       }
+      if (request->hasArg(F("SXP"))) return; // Dedicated model form carries no LED settings.
     }
     // AI: end
 #endif

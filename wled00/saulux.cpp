@@ -12,12 +12,13 @@ struct SauluxProfile {
 };
 
 constexpr SauluxProfile PROFILES[] = {
+  {{-1, -1, -1, -1, -1}, {-1, -1, -1, -1}, -1, -1}, // Await model selection over Wi-Fi.
   {{18, 4, -1, -1, -1}, {17, 16, -1, -1}, 2, -1},
   {{27, 26, 25, 33, 32}, {18, 19, 21, 22}, 12, 23},
   {{32, 33, -1, -1, -1}, {16, -1, -1, -1}, -1, 2}
 };
-constexpr uint8_t MODEL_COUNT = sizeof(PROFILES) / sizeof(PROFILES[0]);
-static_assert(SAULUX_DEFAULT_MODEL >= 1 && SAULUX_DEFAULT_MODEL <= MODEL_COUNT, "Invalid SAULUX default model");
+constexpr uint8_t MODEL_COUNT = sizeof(PROFILES) / sizeof(PROFILES[0]) - 1;
+static_assert(SAULUX_DEFAULT_MODEL >= 0 && SAULUX_DEFAULT_MODEL <= MODEL_COUNT, "Invalid SAULUX default model");
 uint8_t activeModel = SAULUX_DEFAULT_MODEL;
 uint8_t selectedModel = SAULUX_DEFAULT_MODEL;
 uint8_t phyAddress = 1;
@@ -57,12 +58,12 @@ void handleSauluxReboot() {
 // This runs before Ethernet, buses, buttons and relay claim any GPIOs.
 bool prepareSauluxConfig(JsonObject root) {
   const int model = root["saulux"]["model"] | SAULUX_DEFAULT_MODEL;
-  selectedModel = activeModel = model >= 1 && model <= MODEL_COUNT ? model : SAULUX_DEFAULT_MODEL;
+  selectedModel = activeModel = model >= 0 && model <= MODEL_COUNT ? model : SAULUX_DEFAULT_MODEL;
   const int address = root["saulux"]["phyAddress"] | 1;
   phyAddress = address >= 0 && address <= 31 ? address : 1;
   statusInverted = root["saulux"]["statusInverted"] | false;
-  const int applied = root["saulux"]["applied"] | 0;
-  const auto& profile = PROFILES[activeModel - 1];
+  const int applied = root["saulux"]["applied"] | -1;
+  const auto& profile = PROFILES[activeModel];
   if (profile.status >= 0 && PinManager::allocatePin(profile.status, true, PinOwner::StatusLED)) statusPin = profile.status;
   if (applied == activeModel) return false;
 

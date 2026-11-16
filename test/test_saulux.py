@@ -31,7 +31,7 @@ class ProfileTests(unittest.TestCase):
             usermods = re.search(r'  JsonObject usermods_settings = doc\["um"\];\n  if .*?\n  }', config, re.S)[0]
             (temp / "save_flag.cpp").write_text('bool configSaveHandoff(JsonObject doc, bool fromFS) {\n' + initial + '\n' + usermods + '\nreturn needsSave;\n}\n')
             binary = temp / "profiles"
-            subprocess.run([compiler, "-std=c++17", "-DSAULUX", "-DSAULUX_DEFAULT_MODEL=1",
+            subprocess.run([compiler, "-std=c++17", "-DSAULUX", "-DSAULUX_DEFAULT_MODEL=0",
                             "-I" + str(temp), "-I" + str(ROOT / "test/saulux"),
                             "-I" + str(ROOT / "wled00"), str(ROOT / "test/saulux/native.cpp"),
                             "-o", str(binary)], check=True)
@@ -49,7 +49,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(release.prepare("saulux-v1.2.3-rc.1", root), "1.2.3-rc.1")
             self.assertEqual(json.loads((root / "package.json").read_text())["version"], "1.2.3-rc.1")
 
-    def test_publish_all_variants_with_matching_checksums(self):
+    def test_publish_one_universal_image_with_matching_checksum(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             source, dest = root / "source", root / "dist"
@@ -59,7 +59,7 @@ class ReleaseTests(unittest.TestCase):
             release.package("1.2.3", source, dest)
             manifest = json.loads((dest / "manifest.json").read_text())
             self.assertEqual(manifest["tag_name"], "v1.2.3")
-            self.assertEqual(len(manifest["assets"]), 3)
+            self.assertEqual(len(manifest["assets"]), 1)
             for asset in manifest["assets"]:
                 data = (dest / asset["name"]).read_bytes()
                 self.assertEqual(asset["sha256"], hashlib.sha256(data).hexdigest())
