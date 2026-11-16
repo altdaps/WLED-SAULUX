@@ -10,6 +10,74 @@ static void freshPins() {
 }
 
 int main() {
+  {
+    char hostname[14] = {};
+    escapedMac = "AABBCCDDEEFF";
+    assert(makeSauluxHostname(hostname, sizeof(hostname)));
+    assert(std::string(hostname) == "saulux-ddeeff");
+    escapedMac = "102030000001";
+    assert(makeSauluxHostname(hostname, sizeof(hostname)));
+    assert(std::string(hostname) == "saulux-000001");
+    assert(!makeSauluxHostname(hostname, 13));
+    assert(!makeSauluxHostname(nullptr, 14));
+    for (const char* invalid : {"", "aabbcc", "aa:bb:cc:dd:ee:ff", "zzbbccddeeff"}) {
+      escapedMac = invalid;
+      assert(!makeSauluxHostname(hostname, sizeof(hostname)));
+    }
+    escapedMac = "aabbcc123456";
+  }
+  // Upgrade old device names and derive fresh network names when cloning a config.
+  {
+    freshPins();
+    DynamicJsonDocument document(16384);
+    JsonObject root = document.to<JsonObject>();
+    root["id"]["name"] = "WLED";
+    root["id"]["mdns"] = "wled-123456";
+    root["ap"]["ssid"] = "SAULUX-AP";
+    assert(prepareSauluxConfig(root));
+    assert(root["id"]["name"] == "SAULUX");
+    assert(root["id"]["mdns"] == "saulux-123456");
+    assert(root["ap"]["ssid"] == "saulux-123456");
+    serializeSauluxConfig(root);
+    freshPins();
+    assert(!prepareSauluxConfig(root));
+    escapedMac = "aabbcc000002";
+    root["id"]["name"] = "SAULUX kitchen";
+    freshPins();
+    assert(prepareSauluxConfig(root));
+    assert(root["id"]["name"] == "SAULUX kitchen");
+    assert(root["id"]["mdns"] == "saulux-000002");
+    assert(root["ap"]["ssid"] == "saulux-000002");
+    escapedMac = "aabbcc123456";
+  }
+  // Migrate the prior WS2812 default once, keeping counts, pins, color and current limits.
+  {
+    freshPins();
+    DynamicJsonDocument document(16384);
+    JsonObject root = document.to<JsonObject>();
+    root["saulux"]["model"] = 2;
+    root["saulux"]["applied"] = 2;
+    JsonArray buses = root["hw"]["led"].createNestedArray("ins");
+    JsonObject bus = buses.createNestedObject();
+    bus.createNestedArray("pin").add(18);
+    bus["type"] = TYPE_WS2812_RGB;
+    bus["len"] = 137;
+    bus["order"] = 2;
+    bus["maxpwr"] = 1200;
+    buses.createNestedObject()["type"] = 42;
+    assert(prepareSauluxConfig(root));
+    assert(bus["type"] == TYPE_SK6812_RGBW);
+    assert(bus["pin"][0] == 18 && bus["len"] == 137);
+    assert(bus["order"] == 2 && bus["maxpwr"] == 1200);
+    assert(buses[1]["type"] == 42);
+    serializeSauluxConfig(root);
+    freshPins();
+    assert(!prepareSauluxConfig(root));
+    bus["type"] = TYPE_WS2812_RGB; // A subsequent explicit user choice must survive reboot.
+    freshPins();
+    assert(!prepareSauluxConfig(root));
+    assert(bus["type"] == TYPE_WS2812_RGB);
+  }
   // A fresh universal install must wait for model selection without claiming GPIOs.
   {
     freshPins();
@@ -55,6 +123,8 @@ int main() {
       if (pin < 0) break;
       assert(buses[outputCount]["pin"][0] == pin);
       assert(buses[outputCount]["len"] == 30);
+      assert(buses[outputCount]["type"] == TYPE_SK6812_RGBW);
+      assert(buses[outputCount]["order"] == COL_ORDER_GRB);
       assert(buses[outputCount]["start"] == 30 * outputCount);
       assert(pins.insert(pin).second);
       outputCount++;

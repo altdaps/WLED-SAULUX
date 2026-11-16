@@ -58,6 +58,9 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
 
   JsonObject id = doc["id"];
   getStringFromJson(cmDNS, id[F("mdns")], 33);
+#ifdef SAULUX
+  makeSauluxHostname(cmDNS, sizeof(cmDNS));
+#endif
   getStringFromJson(serverDescription, id[F("name")], 33);
 #ifndef WLED_DISABLE_ALEXA
   getStringFromJson(alexaInvocationName, id[F("inv")], 33);
@@ -146,6 +149,9 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
 
   JsonObject ap = doc["ap"];
   getStringFromJson(apSSID, ap[F("ssid")], 33);
+#ifdef SAULUX
+  makeSauluxHostname(apSSID, sizeof(apSSID));
+#endif
   getStringFromJson(apPass, ap["psk"] , 65); //normally not present due to security
   //int ap_pskl = ap[F("pskl")];
   CJSON(apChannel, ap[F("chan")]);
@@ -246,7 +252,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
       uint8_t skipFirst = elm[F("skip")];
       uint16_t start = elm["start"] | 0;
       if (length==0 || start + length > MAX_LEDS) continue; // zero length or we reached max. number of LEDs, just stop
-      uint8_t ledType = elm["type"] | TYPE_WS2812_RGB;
+      uint8_t ledType = elm["type"] | DEFAULT_LED_TYPE;
       bool reversed = elm["rev"];
       bool refresh = elm["ref"] | false;
       uint16_t freqkHz = elm[F("freq")] | 0;  // will be in kHz for DotStar and Hz for PWM

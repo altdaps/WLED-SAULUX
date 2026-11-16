@@ -260,6 +260,9 @@ void getSettingsJS(byte subPage, Print& settingsScript)
     printSetFormValue(settingsScript,PSTR("CM"),cmDNS);
     printSetFormIndex(settingsScript,PSTR("AB"),apBehavior);
     printSetFormValue(settingsScript,PSTR("AS"),apSSID);
+#ifdef SAULUX
+    settingsScript.print(F("d.Sf.AS.readOnly=true;d.Sf.CM.readOnly=true;"));
+#endif
     printSetFormCheckbox(settingsScript,PSTR("AH"),apHide);
 
     l = strlen(apPass);
@@ -338,6 +341,7 @@ void getSettingsJS(byte subPage, Print& settingsScript)
   {
 #ifdef SAULUX
     printSetFormValue(settingsScript, PSTR("SXM"), getSauluxModel());
+    settingsScript.printf_P(PSTR("d.defaultLedType=%u;"), unsigned(DEFAULT_LED_TYPE));
     printSetFormValue(settingsScript, PSTR("SXA"), getSauluxPhyAddress());
     printSetFormCheckbox(settingsScript, PSTR("SXI"), getSauluxStatusInverted());
     settingsScript.print(F("gId('saulux').classList.remove('hide');"));

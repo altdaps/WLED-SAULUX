@@ -136,7 +136,7 @@ function getLoc() {
 		loc = true;
 		locip = localStorage.getItem('locIp');
 		if (!locip) {
-			locip = prompt("File Mode. Please enter WLED IP!");
+			locip = prompt("File Mode. Please enter SAULUX IP!");
 			localStorage.setItem('locIp', locip);
 		}
 	} else {

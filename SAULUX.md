@@ -18,13 +18,33 @@ It reuses WLED's `ESP32-ETHERNET-KIT-VE` configuration. The PHY address defaults
 to **1** and can be changed to 0–31 in the SAULUX settings.
 Ethernet remains disabled by default on the other two profiles.
 
+## Device identity and LED defaults
+
+The device name and product brand are **SAULUX**. The access point name and mDNS
+hostname are generated from the last six hexadecimal characters of the board's
+STA/base MAC address, without colons, in lowercase. For MAC `AA:BB:CC:12:34:56`:
+
+- Access point: `saulux-123456`
+- mDNS URL: `http://saulux-123456.local/`
+
+These network names are derived from the current board at boot and cannot be edited
+in Wi-Fi settings. Restoring another board's configuration retains this board's
+unique network identity. Upgrading an earlier build renames its default `WLED`
+display name to `SAULUX`; explicitly customized display names are kept.
+
+All three profiles default to **SK6812 RGBW**, color order **GRBW**, 30 LEDs per
+output. The first upgrade from earlier SAULUX defaults changes existing WS2812
+outputs to SK6812 RGBW while keeping their GPIOs, counts, color order and power
+limits. This migration runs once; later explicit LED type changes remain saved.
+WLED project credits, license information and protocol names remain in the interface.
+
 ## Select a device
 
 Connect over Wi-Fi (the access point is available on first installation). Open
 **Config → LED Preferences → SAULUX device**, select the model and click **Apply device**.
 The device saves the selection and restarts before configuring the new hardware.
 Changing the model resets LED outputs, inputs, relay and global I2C/SPI pins.
-It creates 30 WS2812/GRB LEDs per output, with consecutive logical LED ranges.
+It creates 30 SK6812 RGBW/GRBW LEDs per output, with consecutive logical LED ranges.
 Set the actual LED type, length, color order and current limits after selecting the model.
 Wi-Fi settings and stored presets are retained. Presets containing segment ranges
 may need adjustment to the new LED layout.
@@ -85,11 +105,11 @@ A fresh installation waits for model selection before configuring hardware.
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v17.0.0-saulux.4
-   git push origin saulux-v17.0.0-saulux.4
+   git tag saulux-v17.0.0-saulux.5
+   git push origin saulux-v17.0.0-saulux.5
    ```
 
-The tag suffix (`17.0.0-saulux.4` here) becomes the firmware and asset version.
+The tag suffix (`17.0.0-saulux.5` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

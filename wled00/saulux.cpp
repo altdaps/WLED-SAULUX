@@ -18,6 +18,7 @@ constexpr SauluxProfile PROFILES[] = {
   {{32, 33, -1, -1, -1}, {16, -1, -1, -1}, -1, 2}
 };
 constexpr uint8_t MODEL_COUNT = sizeof(PROFILES) / sizeof(PROFILES[0]) - 1;
+constexpr uint8_t LED_DEFAULTS_VERSION = 1;
 static_assert(SAULUX_DEFAULT_MODEL >= 0 && SAULUX_DEFAULT_MODEL <= MODEL_COUNT, "Invalid SAULUX default model");
 uint8_t activeModel = SAULUX_DEFAULT_MODEL;
 uint8_t selectedModel = SAULUX_DEFAULT_MODEL;
@@ -32,6 +33,43 @@ bool statusOn = false;
 uint8_t getSauluxModel() { return selectedModel; }
 uint8_t getSauluxPhyAddress() { return phyAddress; }
 bool getSauluxStatusInverted() { return statusInverted; }
+
+// Use the STA/base MAC for a stable identity across Wi-Fi and Ethernet profiles.
+bool makeSauluxHostname(char* buffer, size_t capacity) {
+  if (!buffer || capacity < sizeof("saulux-123456") || escapedMac.length() != 12) return false;
+  char suffix[7] = {};
+  for (size_t i = 0; i < 12; i++) {
+    char c = escapedMac[i];
+    if (c >= 'A' && c <= 'F') c += 'a' - 'A';
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+    if (i >= 6) suffix[i - 6] = c;
+  }
+  snprintf(buffer, capacity, "saulux-%s", suffix);
+  return true;
+}
+
+// Recompute network names on every board, including after restoring another board's config.
+static bool prepareSauluxIdentity(JsonObject root) {
+  char hostname[sizeof("saulux-123456")];
+  if (!makeSauluxHostname(hostname, sizeof(hostname))) return false;
+  JsonObject id = root["id"].is<JsonObject>() ? root["id"].as<JsonObject>() : root.createNestedObject("id");
+  JsonObject ap = root["ap"].is<JsonObject>() ? root["ap"].as<JsonObject>() : root.createNestedObject("ap");
+  bool changed = false;
+  if (strncmp(id["mdns"] | "", hostname, sizeof(hostname)) != 0) {
+    id["mdns"] = hostname;
+    changed = true;
+  }
+  if (strncmp(ap["ssid"] | "", hostname, sizeof(hostname)) != 0) {
+    ap["ssid"] = hostname;
+    changed = true;
+  }
+  const char* name = id["name"] | "";
+  if (name[0] == '\0' || strncmp(name, "WLED", sizeof("WLED")) == 0) {
+    id["name"] = "SAULUX";
+    changed = true;
+  }
+  return changed;
+}
 
 // Accept only exact form values; String::toInt() alone also accepts malformed input.
 SauluxSelection selectSauluxHardware(const String& value, const String& address, bool inverted) {
@@ -57,6 +95,7 @@ void handleSauluxReboot() {
 // Apply hardware defaults only on first installation or a deliberate model change.
 // This runs before Ethernet, buses, buttons and relay claim any GPIOs.
 bool prepareSauluxConfig(JsonObject root) {
+  bool needsSave = prepareSauluxIdentity(root);
   const int model = root["saulux"]["model"] | SAULUX_DEFAULT_MODEL;
   selectedModel = activeModel = model >= 0 && model <= MODEL_COUNT ? model : SAULUX_DEFAULT_MODEL;
   const int address = root["saulux"]["phyAddress"] | 1;
@@ -65,7 +104,16 @@ bool prepareSauluxConfig(JsonObject root) {
   const int applied = root["saulux"]["applied"] | -1;
   const auto& profile = PROFILES[activeModel];
   if (profile.status >= 0 && PinManager::allocatePin(profile.status, true, PinOwner::StatusLED)) statusPin = profile.status;
-  if (applied == activeModel) return false;
+  if (applied == activeModel) {
+    // Upgrade earlier generated WS2812 outputs once, retaining layout and power limits.
+    if ((root["saulux"]["ledDefaults"] | 0) < LED_DEFAULTS_VERSION) {
+      for (JsonObject bus : root["hw"]["led"]["ins"].as<JsonArray>()) {
+        if ((bus["type"] | TYPE_WS2812_RGB) == TYPE_WS2812_RGB) bus["type"] = TYPE_SK6812_RGBW;
+      }
+      needsSave = true;
+    }
+    return needsSave;
+  }
 
   JsonObject hw = root["hw"].is<JsonObject>() ? root["hw"].as<JsonObject>() : root.createNestedObject("hw");
   JsonObject led = hw["led"].is<JsonObject>() ? hw["led"].as<JsonObject>() : hw.createNestedObject("led");
@@ -76,7 +124,7 @@ bool prepareSauluxConfig(JsonObject root) {
     if (pin < 0) break;
     JsonObject bus = buses.createNestedObject();
     bus.createNestedArray("pin").add(pin);
-    bus["type"] = TYPE_WS2812_RGB;
+    bus["type"] = TYPE_SK6812_RGBW;
     bus["order"] = COL_ORDER_GRB;
     bus["start"] = start;
     bus["len"] = 30;
@@ -112,6 +160,7 @@ void serializeSauluxConfig(JsonObject root) {
   config["applied"] = activeModel;
   config["phyAddress"] = phyAddress;
   config["statusInverted"] = statusInverted;
+  config["ledDefaults"] = LED_DEFAULTS_VERSION;
 }
 
 void setupSauluxStatus() {

@@ -772,6 +772,8 @@ LED Timing: <select name="SF${s}">
 				sel.value = sel.querySelector('option[data-type="N"]').value;
 				updateTypeDropdowns(); // update valid bus options including this new one
 				sel.selectedIndex = sel.querySelector('option:not(:disabled)').index;
+				const preferred = sel.querySelector(`option[value="${d.defaultLedType}"]:not(:disabled)`);
+				if (preferred) sel.value = preferred.value;
 				updateTypeDropdowns(); // update again for the newly selected type
 			}
 			if (n==-1) {
@@ -1280,7 +1282,7 @@ Swap: <select id="xw${s}" name="XW${s}">
 		<br><button type="button" onclick="applySauluxDevice()">Apply device</button>
 		<p>Apply device saves the hardware selection and restarts when it changes.
 			Changing model resets LED outputs,
-			inputs and relay to that model's defaults (30 WS2812 LEDs per output).
+			inputs and relay to that model's defaults (30 SK6812 RGBW LEDs per output).
 			Wi-Fi and presets are kept. Configure LED lengths and input types after restart.</p>
 	</div>
 	<h2>LED setup</h2>
@@ -1435,7 +1437,7 @@ Swap: <select id="xw${s}" name="XW${s}">
 		Target refresh rate: <input type="number" class="s" min="0" max="250" name="FR" oninput="UI()" required> FPS
 		<div id="fpsNone" class="warn" style="display: none;">&#9888; Unlimited FPS Mode is experimental &#9888;<br></div>
 		<div id="fpsHigh" class="warn" style="display: none;">&#9888; High FPS Mode is experimental.<br></div>
-		<div id="fpsWarn" class="warn" style="display: none;">Please <a class="lnk" href="sec#backup">backup</a> WLED configuration and presets first!<br></div>
+		<div id="fpsWarn" class="warn" style="display: none;">Please <a class="lnk" href="sec#backup">backup</a> SAULUX configuration and presets first!<br></div>
 		<br><br>
 	</div>
 	<div id="cfg">Config template: <input type="file" name="data2" accept=".json"><button type="button" class="sml" onclick="loadCfg(d.Sf.data2)">Apply</button><br></div>

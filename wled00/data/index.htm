@@ -7,14 +7,14 @@
 	<meta content="yes" name="apple-mobile-web-app-capable">
 	<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAAGFBMVEUAAAD/awCAgID/hzL////WWgDfGzu7FjCGXipzAAAAAXRSTlMAQObYZgAAAGlJREFUKM+lzoEJwCAMBEBXcAVXyApZwRVcwfX735RQeSkF3yj8oWD5m17NBNaOmMC7O8DtA9y9Yu9hYHVULhaFOQD1jrEolBn/cgCLApNPEIW2QhPAsFsEZQecPBQoOJ9hV2Dy9iFEFC672Cg/j/YptAAAAABJRU5ErkJggg=="/>
 	<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0BAMAAADP4xsBAAAAIVBMVEUAAAD/awCAgIBoaGj/hzL////WWgDfGzvW1ta7FjDmSGJvCkHaAAAAAXRSTlMAQObYZgAAAQtJREFUaN7t1dENgjAUhWFXYAVWYAVWYAVWYAVWYAWmtOlNjuaSFlR8uf3/By0n5vOlCQ+iW5rnueu6MQcN7VBz1ZiDhk451P0BdOO03IoODQ0NXXennDgt0qFbptd1TYost0BDQ0Of0pZoLdDt0Muy6PNImyhai6MdBR2G3rZtye37Ll30aaKPFHQMWpPcEj3lyrSnoMPQNun81eXzFHQYuu97O9xFi4WOQduX9RvtKegwtDUMQ5rkjp8kVwJ0eLq73DudEOiotPTXY06H0uhuHnRTtD3qUBp186Bj00Xu7CwXuhHacmPlgkK3Q7s3U5X2v4duhFZV2gcNDQ0NDQ0N/VdaQUNDQxNd6AkmvZOlyMjs6gAAAABJRU5ErkJggg==" sizes="180x180"/>
-	<title>WLED</title>
+	<title>SAULUX</title>
 	<link rel="stylesheet" href="index.css">
 </head>
 <body>
 
 <div id="devBanner">⚠ DEVELOPMENT BUILD — WORK IN PROGRESS — NOT FOR PRODUCTION USE</div>
-<div id="cv" class="overlay">Loading WLED UI...</div>
-<noscript><div class="overlay" style="opacity:1;">Sorry, WLED UI needs JavaScript!</div></noscript>
+<div id="cv" class="overlay">Loading SAULUX UI...</div>
+<noscript><div class="overlay" style="opacity:1;">Sorry, SAULUX UI needs JavaScript!</div></noscript>
 <div id="bg"></div>
 
 <div class="wrapper" id="top">
@@ -346,8 +346,8 @@
 	<div>
 		<button class="btn ibtn" onclick="requestJson()">Refresh</button>
 		<button class="btn ibtn" onclick="toggleNodes()">Instance List</button>
-		<button class="btn ibtn" onclick="window.open(getURL('/update'),'_self');" id="updBt">Update WLED</button>
-		<button class="btn ibtn" id="resetbtn" onclick="cnfReset()">Reboot WLED</button>
+		<button class="btn ibtn" onclick="window.open(getURL('/update'),'_self');" id="updBt">Update SAULUX</button>
+		<button class="btn ibtn" id="resetbtn" onclick="cnfReset()">Reboot SAULUX</button>
 	</div>
 	<br>
 	<span class="h">Made with&#32;<span id="heart">&#10084;&#xFE0E;</span>&#32;by&#32;<a href="https://github.com/Aircoookie/" target="_blank">Aircoookie</a>&#32;and the&#32;<a href="https://wled.discourse.group/" target="_blank">WLED community</a></span>
@@ -355,7 +355,7 @@
 
 <div id="nodes" class="modal">
 	<button class="btn btn-xs close" onclick="toggleNodes()"><i class="icons rot45">&#xe18a;</i></button>
-	<div id="ndlt">WLED instances</div>
+	<div id="ndlt">SAULUX devices</div>
 	<div id="kn">Loading...</div>
 	<div style="position:sticky;bottom:0;">
 		<button class="btn ibtn" onclick="loadNodes()">Refresh</button>

@@ -233,7 +233,7 @@ function onLoad()
 		loc = true;
 		locip = localStorage.getItem('locIp');
 		if (!locip) {
-			locip = prompt("File Mode. Please enter WLED IP!");
+			locip = prompt("File Mode. Please enter SAULUX IP!");
 			localStorage.setItem('locIp', locip);
 		}
 	} else {
@@ -1410,7 +1410,7 @@ function displayRover(i,s)
 {
 	gId('rover').style.transform = (i.live && s.lor == 0 && i.liveseg<0) ? "translateY(0px)":"translateY(100%)";
 	var sour = i.lip ? i.lip:""; if (sour.length > 2) sour = " from " + sour;
-	gId('lv').innerHTML = `WLED is receiving live ${i.lm} data${sour}`;
+	gId('lv').innerHTML = `SAULUX is receiving live ${i.lm} data${sour}`;
 	gId('roverstar').style.display = (i.live && s.lor) ? "block":"none";
 }
 
@@ -1592,7 +1592,7 @@ function readState(s,command=false)
 				errstr = "Brownout Restart.";
 		  break;
 			case 100:
-				errstr = "Please reboot WLED to activate changed settings.";
+				errstr = "Please reboot SAULUX to activate changed settings.";
 		  break;
 			case 101:
 				errstr = "Please switch your device off and back on.";
@@ -3406,12 +3406,12 @@ function showVersionUpgradePrompt(info, oldVersion, newVersion) {
 
 	// Build contextual message based on install vs upgrade
 	const title = isInstall
-		? '🎉 Thank you for installing WLED!'
-		: '🎉 WLED Upgrade Detected!';
+		? '🎉 Thank you for installing SAULUX!'
+		: '🎉 SAULUX Upgrade Detected!';
 
 	const description = isInstall
-		? `You are now running WLED <strong style="text-wrap: nowrap">${newVersion}</strong>.`
-		: `Your WLED has been upgraded from <strong style="text-wrap: nowrap">${oldVersion}</strong> to <strong style="text-wrap: nowrap">${newVersion}</strong>.`;
+		? `You are now running SAULUX <strong style="text-wrap: nowrap">${newVersion}</strong>.`
+		: `Your SAULUX has been upgraded from <strong style="text-wrap: nowrap">${oldVersion}</strong> to <strong style="text-wrap: nowrap">${newVersion}</strong>.`;
 
 	const question = 'Help make WLED better by sharing hardware details like chip type and LED count? This helps us understand how WLED is used and prioritize features — we never collect personal data or your activities.'
 

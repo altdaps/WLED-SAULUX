@@ -206,11 +206,11 @@ void sendImprovInfoResponse() {
   #endif
   strlwr(bString);
   #endif
-  //Use serverDescription if it has been changed from the default "WLED", else mDNS name
-  bool useMdnsName = (strcmp(serverDescription, "WLED") == 0 && strlen(cmDNS) > 0);
+  // Use the unique mDNS name when the device still has its default brand name.
+  bool useMdnsName = (strcmp(serverDescription, WLED_BRAND) == 0 && strlen(cmDNS) > 0);
   char vString[WLED_VERSION_MAX_LEN + 12] = {'\0'};
   sprintf_P(vString, PSTR("%s/%i"), versionString, VERSION);
-  const char *str[4] = {"WLED", vString, bString, useMdnsName ? cmDNS : serverDescription};
+  const char *str[4] = {WLED_BRAND, vString, bString, useMdnsName ? cmDNS : serverDescription};
 
   sendImprovRPCResult(ImprovRPCType::Request_Info, 4, str);
 }

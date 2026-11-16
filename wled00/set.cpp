@@ -168,6 +168,11 @@ void handleSettingsSet(AsyncWebServerRequest *request, byte subPage)
     }
     #endif
 
+    #ifdef SAULUX
+    makeSauluxHostname(apSSID, sizeof(apSSID));
+    makeSauluxHostname(cmDNS, sizeof(cmDNS));
+    #endif
+
     #if defined(ARDUINO_ARCH_ESP32) && defined(WLED_USE_ETHERNET)
     ethernetType = request->arg(F("ETH")).toInt();
     initEthernet();
