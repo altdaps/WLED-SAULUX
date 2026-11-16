@@ -1,6 +1,12 @@
 name: SAULUX Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing saulux-vX.Y.Z tag to build and publish'
+        required: true
+        type: string
   push:
     tags:
       - 'saulux-v*'
@@ -18,6 +24,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       saulux_release: true
+      ref: ${{ inputs.tag || github.ref }}
 
   release:
     name: Publish firmware release
@@ -28,12 +35,16 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Set release version
-        run: python3 tools/saulux_release.py prepare "$GITHUB_REF_NAME"
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: python3 tools/saulux_release.py prepare "$RELEASE_TAG"
       - name: Download firmware
         uses: actions/download-artifact@v4
         with:
@@ -45,9 +56,10 @@ jobs:
       - name: Publish release in this repository
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.bin dist/SHA256SUMS dist/manifest.json \
-            --verify-tag --title "$GITHUB_REF_NAME" --generate-notes --latest
+          gh release create "$RELEASE_TAG" dist/*.bin dist/SHA256SUMS dist/manifest.json \
+            --verify-tag --title "$RELEASE_TAG" --generate-notes --latest
       - name: Upload OTA site
         uses: actions/upload-pages-artifact@v3
         with:

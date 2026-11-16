@@ -4,6 +4,10 @@ name: WLED Build
 on:
   workflow_call:
     inputs:
+      ref:
+        description: 'Optional source tag or ref to build'
+        type: string
+        default: ''
       release:
         description: 'Build the release env matrix (uses .github/platformio_release.ini.template)'
         type: boolean
@@ -23,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
     - name: Apply release config
       if: inputs.release
       run: cp .github/platformio_release.ini.template platformio_release.ini
@@ -50,6 +56,8 @@ jobs:
         environment: ${{ fromJSON(needs.get_default_envs.outputs.environments) }}
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
     - name: Apply release config
       if: inputs.release
       run: cp .github/platformio_release.ini.template platformio_release.ini
@@ -60,7 +68,9 @@ jobs:
         cache: 'npm'
     - name: Set SAULUX release version
       if: inputs.saulux_release
-      run: python3 tools/saulux_release.py prepare "$GITHUB_REF_NAME"
+      env:
+        RELEASE_REF: ${{ inputs.ref || github.ref_name }}
+      run: python3 tools/saulux_release.py prepare "${RELEASE_REF#refs/tags/}"
     - run: |
         npm ci
         VERSION=`date +%y%m%d0`
@@ -113,6 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
