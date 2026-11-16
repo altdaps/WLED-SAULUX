@@ -1,10 +1,12 @@
 # SAULUX firmware
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB flash and no PSRAM**.
-One universal application image supports all three hardware profiles. On first
-installation no model is selected: LED outputs, buttons, relay and Ethernet stay
-unconfigured until you choose your board over Wi-Fi. Subsequent OTA updates preserve
-the saved profile, GPIO settings, Wi-Fi credentials and presets.
+Each release contains three application images with preselected hardware profiles:
+**SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. A fresh installation
+configures its board immediately. Subsequent OTA updates preserve the saved profile,
+GPIO settings, Wi-Fi credentials and presets. An unconfigured universal installation
+(model 0) adopts the uploaded variant's default model. The web interface still allows
+changing the hardware profile when needed.
 
 | Profile | Input GPIOs, in connector order | LED output GPIOs | Relay GPIO | Status GPIO |
 | --- | --- | --- | --- | --- |
@@ -72,18 +74,24 @@ npm run build
 pio run
 ```
 
-The single default environment is `saulux` (`pio run -e saulux`).
+The default environments are `saulux_2i2o`, `saulux_5i4o` and `saulux_ethernet`.
+Build one with, for example, `pio run -e saulux_5i4o`.
 Outputs are written to `build_output/release/`:
 
-- `WLED_<version>_SAULUX.bin`: the same universal OTA application for every board.
-- `WLED_<version>_SAULUX_factory.bin`: that application plus bootloader and partitions
-  for first serial flashing at offset `0x0`.
+| Board | OTA application |
+| --- | --- |
+| SAULUX 2I2O | `WLED_<version>_SAULUX_2I2O.bin` |
+| SAULUX 5I4O | `WLED_<version>_SAULUX_5I4O.bin` |
+| SAULUX ETHERNET | `WLED_<version>_SAULUX_ETHERNET.bin` |
+
+Each has a corresponding `_factory.bin` image with bootloader and partitions for
+first serial flashing at offset `0x0`.
 
 Use the ordinary `.bin` file for OTA. Never upload a factory image through OTA.
 For an empty module, flash the factory image with esptool, for example:
 
 ```sh
-python3 -m esptool --chip esp32 --port /dev/ttyUSB0 write-flash 0x0 WLED_<version>_SAULUX_factory.bin
+python3 -m esptool --chip esp32 --port /dev/ttyUSB0 write-flash 0x0 WLED_<version>_SAULUX_2I2O_factory.bin
 ```
 
 Replace the serial port and filename. Factory images include the actual bootloader,
@@ -91,11 +99,16 @@ partition table and application selected by PlatformIO. For a device already run
 upstream WLED, back up its configuration and presets first. A first manual OTA
 installation may require WLED's **Ignore firmware validation** checkbox because
 SAULUX has a different release name. Keep validation enabled for subsequent updates.
-If upgrading from an earlier `SAULUX_2I2O`, `SAULUX_5I4O` or `SAULUX_ETHERNET`
-build, manually upload the universal `.bin` once with **Ignore firmware validation**
-because the release name changes to `SAULUX`. The saved board selection and GPIO
-settings are preserved. Keep validation enabled for later universal OTA updates.
-A fresh installation waits for model selection before configuring hardware.
+When upgrading from universal versions `saulux.4`–`saulux.6`, manually upload the
+ordinary `.bin` for your board once. **Leave firmware validation enabled:** all three
+variants retain `SAULUX` as the firmware compatibility identifier. The earlier
+universal update page cannot select the new variant filenames automatically.
+Your saved board profile and GPIO settings remain in use; the binary's default
+profile applies only to fresh or unconfigured installations.
+
+Earlier `saulux.1`–`saulux.3` builds use model-specific compatibility identifiers;
+their first manual upgrade to these variants may require **Ignore firmware validation**.
+Keep validation enabled after that transition.
 
 ## GitHub Actions releases and OTA
 
@@ -105,15 +118,15 @@ A fresh installation waits for model selection before configuring hardware.
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v17.0.0-saulux.6
-   git push origin saulux-v17.0.0-saulux.6
+   git tag saulux-v17.0.0-saulux.7
+   git push origin saulux-v17.0.0-saulux.7
    ```
 
-The tag suffix (`17.0.0-saulux.6` here) becomes the firmware and asset version.
+The tag suffix (`17.0.0-saulux.7` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
-universal firmware, publishes OTA/factory images and SHA256 checksums, and deploys
+three firmware variants, publishes their OTA/factory images and SHA256 checksums, and deploys
 the same files plus `manifest.json` to:
 
 `https://altdaps.github.io/WLED-SAULUX/`
@@ -125,9 +138,12 @@ open and connected to the device until the upload completes. Internet access is
 needed on the browser; the ESP32 itself does not need outbound internet access.
 Normal firmware validation stays enabled. Interrupted/failed downloads are not uploaded.
 
-Every board downloads the same `SAULUX` application. Changing the model in the menu
-only changes the saved hardware profile, which survives updates. No firmware is
-downloaded from the upstream repository or the WLED proxy in SAULUX builds. Inherited upstream nightly publishing is disabled in this fork.
+Each board downloads the application matching its active hardware profile, exposed
+as `otaRelease` in `/json/info`. The shared `release: "SAULUX"` field keeps normal
+firmware validation compatible across all three variants and the earlier universal
+build. Changing the model in the menu also changes the OTA target after reboot.
+No firmware is downloaded from the upstream repository or the WLED proxy in SAULUX
+builds. Inherited upstream nightly publishing is disabled in this fork.
 
 The latest successfully deployed tag is the OTA channel, including tags with suffixes.
 A release can exist before its Pages deployment finishes; OTA stays on the previous

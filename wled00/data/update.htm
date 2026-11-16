@@ -39,7 +39,7 @@
 					deviceInfo = data;
 					document.querySelector('.installed-version').textContent = `${data.brand} ${data.ver} (${data.vid})`;
 					const repoUrl = data.repo && data.repo !== "unknown" ? "https://github.com/" + data.repo + "/releases/latest" : null;
-					document.querySelector('.release-name').textContent = data.release;
+					document.querySelector('.release-name').textContent = data.otaRelease || data.release;
 					// assemble update URL and update release badge
 					if (repoUrl) {
 						const badgeUrl = "https://img.shields.io/github/release/" + data.repo + ".svg?style=flat-square";
@@ -50,14 +50,14 @@
 						latestRelease(data)
 							.then(gh => {
 								const ver = gh.tag_name.replace(/^v/, '');
-								const suffix = `_${ver}_${data.release}.bin`;
+								const suffix = `_${ver}_${data.otaRelease || data.release}.bin`;
 								const asset = gh.assets.find(a => a.name.endsWith(suffix));
 								if (asset) {
 									const binUrl = firmwareUrl(data, asset);
 									const el = document.querySelector('.release-name');
 									const link = document.createElement('a');
 									link.href = binUrl;
-									link.textContent = data.release;
+									link.textContent = data.otaRelease || data.release;
 									el.replaceChildren(link);
 								}
 							})
@@ -106,7 +106,7 @@
 				status.textContent = 'Checking GitHub for latest release...';
 				const ghRelease = await latestRelease(info);
 				const releaseVer = ghRelease.tag_name.replace(/^v/, '');
-				const assetSuffix = `_${releaseVer}_${info.release}.bin`;
+				const assetSuffix = `_${releaseVer}_${info.otaRelease || info.release}.bin`;
 				const asset = ghRelease.assets.find(a => a.name.endsWith(assetSuffix));
 				if (!asset) {
 					const available = ghRelease.assets.map(a => a.name).join(', ');

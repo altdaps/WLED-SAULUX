@@ -7,7 +7,7 @@ from pathlib import Path
 
 def create_factory(source, target, env):
     version = json.loads(Path("package.json").read_text())["version"]
-    release = next(item[1] for item in env["CPPDEFINES"]
+    release = env.GetProjectOption("custom_saulux_release_name", "") or next(item[1] for item in env["CPPDEFINES"]
                    if isinstance(item, (tuple, list)) and item[0] == "WLED_RELEASE_NAME")
     release = release.replace('\\"', '').replace('"', '')
     images = [(int(str(offset), 0), Path(env.subst(str(filename))))

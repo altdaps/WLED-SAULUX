@@ -31,6 +31,17 @@ bool statusOn = false;
 }
 
 uint8_t getSauluxModel() { return selectedModel; }
+
+// Follow the active hardware profile when selecting a variant for the next OTA update.
+const char* getSauluxOtaRelease() {
+  switch (activeModel) {
+    case 1: return "SAULUX_2I2O";
+    case 2: return "SAULUX_5I4O";
+    case 3: return "SAULUX_ETHERNET";
+    default: return "SAULUX";
+  }
+}
+
 uint8_t getSauluxPhyAddress() { return phyAddress; }
 bool getSauluxStatusInverted() { return statusInverted; }
 
@@ -96,7 +107,9 @@ void handleSauluxReboot() {
 // This runs before Ethernet, buses, buttons and relay claim any GPIOs.
 bool prepareSauluxConfig(JsonObject root) {
   bool needsSave = prepareSauluxIdentity(root);
-  const int model = root["saulux"]["model"] | SAULUX_DEFAULT_MODEL;
+  int model = root["saulux"]["model"] | SAULUX_DEFAULT_MODEL;
+  // An unconfigured universal installation adopts this variant's default profile.
+  if (model == 0) model = SAULUX_DEFAULT_MODEL;
   selectedModel = activeModel = model >= 0 && model <= MODEL_COUNT ? model : SAULUX_DEFAULT_MODEL;
   const int address = root["saulux"]["phyAddress"] | 1;
   phyAddress = address >= 0 && address <= 31 ? address : 1;

@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build universal SAULUX firmware
+    name: Build three SAULUX firmware variants
     uses: ./.github/workflows/build.yml
     with:
       saulux_release: true
@@ -48,7 +48,7 @@ jobs:
       - name: Download firmware
         uses: actions/download-artifact@v4
         with:
-          pattern: firmware-SAULUX
+          pattern: firmware-SAULUX_*
           path: build_output/release
           merge-multiple: true
       - name: Validate binaries and create OTA manifest

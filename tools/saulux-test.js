@@ -20,27 +20,44 @@ function updater(fetch) {
 	const context = vm.createContext({fetch, console, File, DataTransfer: Transfer,
 		gId: field, toggle() {}, document: {querySelector: field}});
 	vm.runInContext(source, context);
-	context.deviceInfo = {repo: 'altdaps/WLED-SAULUX', release: 'SAULUX', otaBase: 'https://altdaps.github.io/WLED-SAULUX'};
+	context.deviceInfo = {repo: 'altdaps/WLED-SAULUX', release: 'SAULUX', otaRelease: 'SAULUX_5I4O', otaBase: 'https://altdaps.github.io/WLED-SAULUX'};
 	return {context, field, submitted: () => submitted};
 }
 
-test('OTA uses this fork and selects the universal firmware', async () => {
-	const urls = [];
-	const asset = {name: 'WLED_1.0.0_SAULUX.bin', size: 3};
-	const app = updater(async url => {
-		urls.push(url);
-		return url.endsWith('manifest.json')
-			? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_ESP32.bin', size: 3}, asset]})}
-			: {ok: true, blob: async () => new Blob([Uint8Array.from([0xe9, 1, 2])])};
+for (const target of ['SAULUX_2I2O', 'SAULUX_5I4O', 'SAULUX_ETHERNET']) {
+	test(`OTA selects ${target} from this fork using the active model`, async () => {
+		const urls = [];
+		const assets = ['SAULUX_2I2O', 'SAULUX_5I4O', 'SAULUX_ETHERNET'].flatMap(name => [
+			{name: `WLED_1.0.0_${name}_factory.bin`, size: 3},
+			{name: `WLED_1.0.0_${name}.bin`, size: 3}
+		]);
+		const app = updater(async url => {
+			urls.push(url);
+			return url.endsWith('manifest.json')
+				? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets})}
+				: {ok: true, blob: async () => new Blob([Uint8Array.from([0xe9, 1, 2])])};
+		});
+		app.context.deviceInfo.otaRelease = target;
+		await app.context.autoUpdate();
+		const filename = `WLED_1.0.0_${target}.bin`;
+		assert.deepEqual(urls, ['https://altdaps.github.io/WLED-SAULUX/manifest.json', 'https://altdaps.github.io/WLED-SAULUX/' + filename]);
+		assert.equal(app.submitted(), true);
+		assert.equal(app.field('input[name="update"]').files[0].name, filename);
 	});
+}
+
+test('OTA retains release-name selection for builds without model metadata', async () => {
+	const app = updater(async url => url.endsWith('manifest.json')
+		? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX.bin', size: 3}]})}
+		: {ok: true, blob: async () => new Blob([Uint8Array.from([0xe9, 1, 2])])});
+	delete app.context.deviceInfo.otaRelease;
 	await app.context.autoUpdate();
-	assert.deepEqual(urls, ['https://altdaps.github.io/WLED-SAULUX/manifest.json', 'https://altdaps.github.io/WLED-SAULUX/' + asset.name]);
 	assert.equal(app.submitted(), true);
-	assert.equal(app.field('input[name="update"]').files[0].name, asset.name);
+	assert.equal(app.field('input[name="update"]').files[0].name, 'WLED_1.0.0_SAULUX.bin');
 });
 
-test('OTA refuses a missing universal firmware and never uploads another image', async () => {
-	const app = updater(async () => ({ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_ESP32_Ethernet.bin'}]})}));
+test('OTA refuses an update when the active model firmware is missing', async () => {
+	const app = updater(async () => ({ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX_2I2O.bin'}, {name: 'WLED_1.0.0_SAULUX_ETHERNET.bin'}]})}));
 	await app.context.autoUpdate();
 	assert.equal(app.submitted(), false);
 	assert.match(app.field('autoUpdStatus').textContent, /Firmware not found/);
@@ -48,7 +65,7 @@ test('OTA refuses a missing universal firmware and never uploads another image',
 
 test('OTA refuses truncated downloads', async () => {
 	const app = updater(async url => url.endsWith('manifest.json')
-		? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX.bin', size: 100}]})}
+		? {ok: true, json: async () => ({tag_name: 'v1.0.0', assets: [{name: 'WLED_1.0.0_SAULUX_5I4O.bin', size: 100}]})}
 		: {ok: true, blob: async () => new Blob(['short'])});
 	await app.context.autoUpdate();
 	assert.equal(app.submitted(), false);

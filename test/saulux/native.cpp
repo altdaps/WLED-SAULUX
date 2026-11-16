@@ -10,6 +10,11 @@ static void freshPins() {
 }
 
 int main() {
+  const int expectedInputs[][5] = {{18,4,-1,-1,-1}, {27,26,25,33,32}, {32,33,-1,-1,-1}};
+  const int expectedOutputs[][4] = {{17,16,-1,-1}, {18,19,21,22}, {16,-1,-1,-1}};
+  const int expectedRelay[] = {2,12,-1};
+  const int expectedStatus[] = {-1,23,2};
+  const char* expectedRelease[] = {"SAULUX", "SAULUX_2I2O", "SAULUX_5I4O", "SAULUX_ETHERNET"};
   {
     char hostname[14] = {};
     escapedMac = "AABBCCDDEEFF";
@@ -78,34 +83,47 @@ int main() {
     assert(!prepareSauluxConfig(root));
     assert(bus["type"] == TYPE_WS2812_RGB);
   }
-  // A fresh universal install must wait for model selection without claiming GPIOs.
-  {
+  // Fresh installs and unconfigured universal devices adopt the compiled variant.
+  for (bool unconfigured : {false, true}) {
     freshPins();
     DynamicJsonDocument document(16384);
     JsonObject root = document.to<JsonObject>();
-    root["hw"]["relay"]["pin"] = 2; // An upstream/legacy config must not select a board implicitly.
-    assert(prepareSauluxConfig(root));
-    assert(getSauluxModel() == 0);
-    assert(root["hw"]["led"]["ins"].is<JsonArray>());
-    assert(root["hw"]["led"]["ins"].size() == 0);
-    assert(root["hw"]["btn"]["ins"].size() == 0);
-    assert(root["hw"]["relay"]["pin"] == -1);
-    assert(root["eth"]["type"] == 0);
-    assert(PinManager::allocated.empty());
+    if (unconfigured) {
+      root["saulux"]["model"] = 0;
+      root["saulux"]["applied"] = 0;
+      root["saulux"]["ledDefaults"] = 1;
+      root["id"]["name"] = "SAULUX";
+      root["id"]["mdns"] = "saulux-123456";
+      root["ap"]["ssid"] = "saulux-123456";
+    }
+    assert(prepareSauluxConfig(root) == (!unconfigured || SAULUX_DEFAULT_MODEL != 0));
+    assert(getSauluxModel() == SAULUX_DEFAULT_MODEL);
+    assert(std::string(getSauluxOtaRelease()) == expectedRelease[SAULUX_DEFAULT_MODEL]);
+    if (SAULUX_DEFAULT_MODEL == 0) {
+      assert(root["hw"]["led"]["ins"].size() == 0);
+      assert(root["hw"]["btn"]["ins"].size() == 0);
+      assert(PinManager::allocated.empty());
+    } else {
+      assert(root["hw"]["led"]["ins"][0]["pin"][0] == expectedOutputs[SAULUX_DEFAULT_MODEL - 1][0]);
+      assert(root["hw"]["led"]["ins"][0]["type"] == TYPE_SK6812_RGBW);
+      assert(root["hw"]["relay"]["pin"] == expectedRelay[SAULUX_DEFAULT_MODEL - 1]);
+      assert(root["eth"]["type"] == (SAULUX_DEFAULT_MODEL == 3 ? 7 : 0));
+    }
     serializeSauluxConfig(root);
+    freshPins();
     assert(!prepareSauluxConfig(root));
-    assert(selectSauluxHardware("3", "1", false) == SauluxSelection::Changed);
+    const int next = SAULUX_DEFAULT_MODEL == 3 ? 1 : 3;
+    assert(selectSauluxHardware(next == 1 ? "1" : "3", "1", false) == SauluxSelection::Changed);
+    // OTA selection follows running GPIOs until the saved change is applied on reboot.
+    assert(std::string(getSauluxOtaRelease()) == expectedRelease[SAULUX_DEFAULT_MODEL]);
     serializeSauluxConfig(root);
-    assert(root["saulux"]["applied"] == 0);
+    assert(root["saulux"]["applied"] == SAULUX_DEFAULT_MODEL);
     freshPins();
     assert(prepareSauluxConfig(root));
-    assert(getSauluxModel() == 3);
-    assert(root["hw"]["led"]["ins"][0]["pin"][0] == 16);
+    assert(getSauluxModel() == next);
+    assert(std::string(getSauluxOtaRelease()) == expectedRelease[next]);
+    assert(root["hw"]["led"]["ins"][0]["pin"][0] == expectedOutputs[next - 1][0]);
   }
-  const int expectedInputs[][5] = {{18,4,-1,-1,-1}, {27,26,25,33,32}, {32,33,-1,-1,-1}};
-  const int expectedOutputs[][4] = {{17,16,-1,-1}, {18,19,21,22}, {16,-1,-1,-1}};
-  const int expectedRelay[] = {2,12,-1};
-  const int expectedStatus[] = {-1,23,2};
   for (int model = 1; model <= 3; model++) {
     freshPins();
     DynamicJsonDocument document(16384);
@@ -114,6 +132,7 @@ int main() {
     root["nw"]["ins"][0]["ssid"] = "keep-wifi";
     assert(prepareSauluxConfig(root));
     assert(getSauluxModel() == model);
+    assert(std::string(getSauluxOtaRelease()) == expectedRelease[model]);
     assert(statusPin == expectedStatus[model - 1]);
     assert(root["eth"]["type"] == (model == 3 ? 7 : 0));
     std::set<int> pins = PinManager::allocated;

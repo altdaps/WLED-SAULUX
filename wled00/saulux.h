@@ -8,6 +8,7 @@ void serializeSauluxConfig(JsonObject root);
 enum class SauluxSelection { Invalid, Unchanged, Changed };
 SauluxSelection selectSauluxHardware(const String& model, const String& phyAddress, bool statusInverted);
 uint8_t getSauluxModel();
+const char* getSauluxOtaRelease();
 uint8_t getSauluxPhyAddress();
 bool getSauluxStatusInverted();
 void handleSauluxReboot();
