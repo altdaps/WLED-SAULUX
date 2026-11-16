@@ -2,6 +2,11 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+Two-ended white light lines can use API presets `{"sauluxLine":"start","tt":20}`
+and `{"sauluxLine":"end","tt":20}`. Each toggles from the current light state,
+with white filling from that endpoint and darkness returning towards it. Assign
+presets to the endpoint buttons; `tt:20` is a 2-second transition.
+
 Button state publishing is available at `<Device Topic>/input/1/state` and subsequent
 one-based input numbers: `1` = pressed, `0` = released. Enable MQTT and **Publish on
 button press** in Sync Interfaces. States are debounced, retained and refreshed on

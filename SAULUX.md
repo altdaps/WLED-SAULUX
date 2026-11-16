@@ -3,7 +3,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.2`.
+are not included. Fork releases use versions such as `16.0.1-saulux.3`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -72,6 +72,32 @@ The **Apply settings** button applies only the PHY/status fields; **Save** appli
 external REFCLK, actual flash capacity and boot strap levels (including GPIO12)
 on the real boards before use. Local tests and firmware compilation do not establish
 correct electrical operation.
+
+## Two-ended white light line
+
+A custom API preset can toggle the main segment using an endpoint-aware curtain:
+
+```json
+{"sauluxLine":"start","tt":20}
+```
+
+Use `"end"` for the opposite endpoint. `start` means the end at the first LED in the
+data chain. `tt` is the ordinary one-shot transition duration in tenths of a second;
+20 gives a 2-second fill. Save the two commands as separate API presets and assign
+them to the respective buttons in Time & Macros. Assign the same preset to short,
+long and double press for that button to act immediately on the rising edge.
+
+The command reads the current light state: when off, white fills from the pressed
+endpoint; when on, darkness travels back towards that endpoint. Both buttons share
+the light state, so turning on at one end and off at the other works. The command
+selects Solid, uses the dedicated white channel on RGBW strips (RGB white otherwise),
+removes segment reverse/mirror and cancels a nightlight. Existing brightness and LED
+boundaries are retained; segment opacity is set to full. It controls the master
+power and main segment, and is intended for a single light line.
+
+For a line whose first LED is at the left button, assign `start` to the left button
+and `end` to the right. A separate ordinary off preset can initialize the white
+Solid scene and be selected as the boot preset.
 
 ## Button states over MQTT
 
@@ -177,11 +203,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.2
-   git push origin saulux-v16.0.1-saulux.2
+   git tag saulux-v16.0.1-saulux.3
+   git push origin saulux-v16.0.1-saulux.3
    ```
 
-The tag suffix (`16.0.1-saulux.2` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.3` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

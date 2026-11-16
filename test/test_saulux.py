@@ -73,6 +73,19 @@ class ProfileTests(unittest.TestCase):
                                     "-o", str(binary)], check=True)
                     subprocess.run([str(binary)], check=True)
 
+    def test_native_line_toggle(self):
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as folder:
+            temp = Path(folder)
+            source = (ROOT / "wled00/saulux_line.cpp").read_text()
+            (temp / "line_runtime.cpp").write_text(source.replace('#include "wled.h"', '#include "native_shim.h"'))
+            binary = temp / "line"
+            subprocess.run([compiler, "-std=c++17", "-DSAULUX", "-I" + str(temp),
+                            "-I" + str(ROOT / "test/saulux"), "-I" + str(ROOT / "wled00"),
+                            str(ROOT / "test/saulux/line_native.cpp"), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
 
 class ReleaseTests(unittest.TestCase):
     def test_prepare_rejects_invalid_tags(self):
