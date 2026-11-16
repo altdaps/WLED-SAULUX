@@ -105,11 +105,11 @@ A fresh installation waits for model selection before configuring hardware.
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v17.0.0-saulux.5
-   git push origin saulux-v17.0.0-saulux.5
+   git tag saulux-v17.0.0-saulux.6
+   git push origin saulux-v17.0.0-saulux.6
    ```
 
-The tag suffix (`17.0.0-saulux.5` here) becomes the firmware and asset version.
+The tag suffix (`17.0.0-saulux.6` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
@@ -133,6 +133,13 @@ The latest successfully deployed tag is the OTA channel, including tags with suf
 A release can exist before its Pages deployment finishes; OTA stays on the previous
 successfully deployed version until deployment succeeds. Re-run a failed deployment
 job rather than creating the same release again.
+
+## Interface loading
+
+The interface has no development-build overlay. Controls and presets become
+available before palette previews finish downloading. The WebSocket control channel
+opens after the initial state is received, and an unavailable optional `skin.css`
+file does not prevent control from starting. HTTP API reads remain sequential.
 
 ## Validation
 
