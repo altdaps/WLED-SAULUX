@@ -3,7 +3,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.3`.
+are not included. Fork releases use versions such as `16.0.1-saulux.4`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -93,7 +93,11 @@ the light state, so turning on at one end and off at the other works. The comman
 selects Solid, uses the dedicated white channel on RGBW strips (RGB white otherwise),
 removes segment reverse/mirror and cancels a nightlight. Existing brightness and LED
 boundaries are retained; segment opacity is set to full. It controls the master
-power and main segment, and is intended for a single light line.
+power and main segment, and is intended for a single light line. During the curtain,
+additional endpoint presses are ignored without queueing or extending the transition.
+A held button must be released and pressed again after the curtain finishes.
+The lit portion keeps its brightness: only the boundary moves, without a global fade.
+Ordinary UI power, brightness, segment or blending-style controls can override the scene.
 
 For a line whose first LED is at the left button, assign `start` to the left button
 and `end` to the right. A separate ordinary off preset can initialize the white
@@ -203,11 +207,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.3
-   git push origin saulux-v16.0.1-saulux.3
+   git tag saulux-v16.0.1-saulux.4
+   git push origin saulux-v16.0.1-saulux.4
    ```
 
-The tag suffix (`16.0.1-saulux.3` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.4` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

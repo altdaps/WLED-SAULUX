@@ -80,6 +80,15 @@ class ProfileTests(unittest.TestCase):
             temp = Path(folder)
             source = (ROOT / "wled00/saulux_line.cpp").read_text()
             (temp / "line_runtime.cpp").write_text(source.replace('#include "wled.h"', '#include "native_shim.h"'))
+            led = (ROOT / "wled00/led.cpp").read_text()
+            brightness = led[led.index("void applyBri()"):led.index("//called after every state changes")]
+            transitions = led[led.index("void handleTransitions()"):led.index("// legacy method")]
+            (temp / "line_transitions.cpp").write_text(brightness + transitions)
+            presets = (ROOT / "wled00/presets.cpp").read_text()
+            line_guard = presets[presets.index("#ifdef SAULUX\n"):presets.index("  //HTTP API commands")]
+            (temp / "line_preset.cpp").write_text(
+                "void applyLinePreset(JsonObject fdo) { uint8_t tmpMode = 0, tmpPreset = 3;\n"
+                + line_guard + "\n++genericPresetUpdates; }\n")
             binary = temp / "line"
             subprocess.run([compiler, "-std=c++17", "-DSAULUX", "-I" + str(temp),
                             "-I" + str(ROOT / "test/saulux"), "-I" + str(ROOT / "wled00"),

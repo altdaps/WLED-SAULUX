@@ -10,6 +10,7 @@
   Modified heavily for WLED
 */
 #include "wled.h"
+#include "saulux.h"
 #include "FXparticleSystem.h"  // TODO: better define the required function (mem service) in FX.h?
 #include "colors.h"
 
@@ -1580,7 +1581,11 @@ void WS2812FX::blendSegment(const Segment &topSegment) const {
         && x < oCols && y < oRows) {
         // we need to blend old segment using fade as pixels are not clipped
         c_a = color_blend16(c_a, segO->getPixelColorRaw(x + y*oCols), progInv);
-      } else if (blendingStyle != TRANSITION_FADE) {
+      } else if (blendingStyle != TRANSITION_FADE
+#ifdef SAULUX
+          && !isSauluxLineTransition() // the line already blends white/black at a fixed master brightness
+#endif
+      ) {
         // if we have global brightness change (not On/Off change) we will ignore transition style and just fade brightness (see led.cpp)
         // workaround for On/Off transition
         // (bri != briT) && !bri => from On to Off
@@ -1652,7 +1657,11 @@ void WS2812FX::blendSegment(const Segment &topSegment) const {
       if (segO && blendingStyle == TRANSITION_FADE && topSegment.mode != segO->mode && i < oLen) {
         // we need to blend old segment using fade as pixels are not clipped
         c_a = color_blend16(c_a, segO->getPixelColorRaw(i), progInv);
-      } else if (blendingStyle != TRANSITION_FADE) {
+      } else if (blendingStyle != TRANSITION_FADE
+#ifdef SAULUX
+          && !isSauluxLineTransition() // the line already blends white/black at a fixed master brightness
+#endif
+      ) {
         // if we have global brightness change (not On/Off change) we will ignore transition style and just fade brightness (see led.cpp)
         // workaround for On/Off transition
         // (bri != briT) && !bri => from On to Off

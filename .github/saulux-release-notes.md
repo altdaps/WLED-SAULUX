@@ -5,7 +5,10 @@ Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETH
 Two-ended white light lines can use API presets `{"sauluxLine":"start","tt":20}`
 and `{"sauluxLine":"end","tt":20}`. Each toggles from the current light state,
 with white filling from that endpoint and darkness returning towards it. Assign
-presets to the endpoint buttons; `tt:20` is a 2-second transition.
+presets to the endpoint buttons; `tt:20` is a 2-second transition. Repeated presses
+during a curtain are ignored without queueing or resetting its timer. The lit portion
+keeps a steady brightness while the white/black boundary moves, avoiding a full-line
+flash or fade before the curtain.
 
 Button state publishing is available at `<Device Topic>/input/1/state` and subsequent
 one-based input numbers: `1` = pressed, `0` = released. Enable MQTT and **Publish on
