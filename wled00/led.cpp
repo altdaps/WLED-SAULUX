@@ -45,7 +45,11 @@ void toggleOnOff()
   if (bri == 0)
   {
     bri = briLast;
+#ifdef SAULUX
+    if (!isSauluxLineTransition()) strip.restartRuntime(); // a reversal must retain effect state
+#else
     strip.restartRuntime();
+#endif
   } else
   {
     briLast = bri;
@@ -118,7 +122,11 @@ void stateUpdated(byte callMode) {
     nightlightStartTime = now;
   }
   if (briT == 0) {
-    if (callMode != CALL_MODE_NOTIFICATION) strip.resetTimebase(); //effect start from beginning
+    if (callMode != CALL_MODE_NOTIFICATION
+#ifdef SAULUX
+        && !isSauluxLineTransition()
+#endif
+    ) strip.resetTimebase(); // effect start from beginning, except a continuous line reversal
   }
 
   if (bri > 0) briLast = bri;

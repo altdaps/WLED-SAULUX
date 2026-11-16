@@ -2,16 +2,18 @@
 #include "native_shim.h"
 #include <cassert>
 using byte = uint8_t;
+inline constexpr uint32_t BLACK = 0;
 inline constexpr int TRANSITION_SWIPE_RIGHT = 2, TRANSITION_SWIPE_LEFT = 3;
 inline uint8_t bri = 0, briLast = 128, briT = 0, briOld = 0;
-inline bool transitionActive = false, jsonTransitionOnce = false;
+inline bool transitionActive = false, jsonTransitionOnce = false, stateChanged = false;
 inline bool realtimeOverride = false, realtimeMode = false, arlsForceMaxBri = false;
 inline uint32_t transitionStartTime = 0;
 inline unsigned transitionDelay = 2000, interfaceUpdateCallMode = 0;
 void updateInterfaces(unsigned) {}
 class Segment {
 public:
-  bool on = true, transitioning = false;
+  bool on = true, transitioning = false, freeze = false;
+  unsigned start = 0;
   uint8_t opacity = 255, caps = 3;
   uint32_t colors[3] = {0xff000000, 0, 0};
   uint8_t getLightCapabilities() const { return caps; }
@@ -23,6 +25,8 @@ inline struct LineStrip {
   LineSegment segment, other;
   unsigned duration = 2000;
   uint8_t brightness = 0;
+  unsigned resets = 0;
+  void restartRuntime() { ++resets; }
   LineSegment& getMainSegment() { return segment; }
   LineSegment& getSegment(uint8_t id) { return id == 0 ? segment : other; }
   uint8_t getMainSegmentId() const { return 0; }
@@ -34,6 +38,7 @@ inline struct LineStrip {
 } strip;
 #include "line_runtime.cpp"
 #include "line_transitions.cpp"
+#include "line_mask.cpp"
 inline unsigned acceptedPresetUpdates = 0, genericPresetUpdates = 0, releasedLocks = 0;
 void deserializeState(JsonObject root, uint8_t, uint8_t) {
   if (prepareSauluxLineToggle(root)) ++acceptedPresetUpdates;
@@ -50,14 +55,19 @@ void checkCurtain(const char* endpoint, bool wasOn, uint32_t start) {
   tick = start;
   DynamicJsonDocument doc(4096); JsonObject root = doc.to<JsonObject>();
   root["sauluxLine"] = endpoint; root["tt"] = 20;
+  root["seg"]["fx"] = 0; root["seg"]["pal"] = 0; root["seg"]["bri"] = 255;
+  root["on"] = true; // older saved API presets can contain expanded white scene fields
   assert(prepareSauluxLineToggle(root));
   assert(root["on"] == !wasOn && root["tt"] == 20);
   const bool right = (std::string(endpoint) == "start") != wasOn;
   assert(root["bs"] == (right ? 2 : 3));
-  assert(root["seg"]["id"] == 0 && root["seg"]["fx"] == 0);
-  assert(root["seg"]["on"] == true && root["seg"]["rev"] == false);
-  assert(root["seg"]["col"][0][3] == 255);
-  assert(root["seg"]["col"][0][0] == 0);
+  assert(root["seg"]["id"] == 0 && root["seg"]["on"] == true);
+  if (wasOn) {
+    for (const char* field : {"fx", "pal", "col", "bri", "rev", "mi"}) assert(root["seg"][field].isNull());
+  } else {
+    assert(root["seg"]["fx"] == 0 && root["seg"]["rev"] == false);
+    assert(root["seg"]["col"][0][3] == 255 && root["seg"]["col"][0][0] == 0);
+  }
   assert(root["nl"]["on"] == false);
   bri = wasOn ? 0 : briLast; transitionActive = true; jsonTransitionOnce = true;
   transitionStartTime = start; strip.duration = 2000; strip.segment.transitioning = true;
@@ -91,6 +101,9 @@ void checkReversals(const char* endpoint, const char* reverseButton, bool wasOn,
   reverse["sauluxLine"] = reverseButton; reverse["tt"] = 20;
   assert(prepareSauluxLineToggle(reverse));
   assert(reverse["on"] == wasOn);
+  for (const char* field : {"fx", "pal", "col", "bri", "rev", "mi"}) assert(reverse["seg"][field].isNull());
+  bri = 0; const unsigned resetsBefore = strip.resets;
+  toggleOnOff(); assert(strip.resets == resetsBefore); // rising master target must not restart the effect
   assert(isSauluxLineFromStart() == anchor);
   assert(getSauluxLineLitPixels(strip.segment, 105) == before); // exact positional continuity
   assert(reverse["tt"].as<unsigned>() == (elapsed + 99) / 100);
@@ -150,6 +163,10 @@ int main() {
   assert(acceptedPresetUpdates == 2 && genericPresetUpdates == 0 && releasedLocks == 2);
   endSauluxLineTransition();
   assert(getSauluxLineBrightness(37) == 37); // ordinary brightness is unaffected
-  std::puts("Endpoint curtains, continuous reversals, constant speed, brightness and rollover passed");
+  bri = 0; const unsigned resetsBefore = strip.resets;
+  toggleOnOff(); assert(strip.resets == resetsBefore + 1); // ordinary power behavior is retained
+  for (bool anchor : {false, true}) for (int lit : {0, 1, 52, 104, 105}) checkMask(lit, anchor);
+  checkMask(-1, true);
+  std::puts("Palette/scene preservation, physical curtain bounds, runtime continuity and reversals passed");
 }
 // AI: end

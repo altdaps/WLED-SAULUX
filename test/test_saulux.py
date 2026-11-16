@@ -83,7 +83,26 @@ class ProfileTests(unittest.TestCase):
             led = (ROOT / "wled00/led.cpp").read_text()
             brightness = led[led.index("void applyBri()"):led.index("//called after every state changes")]
             transitions = led[led.index("void handleTransitions()"):led.index("// legacy method")]
-            (temp / "line_transitions.cpp").write_text(brightness + transitions)
+            power = led[led.index("void toggleOnOff()"):led.index("//scales the brightness")]
+            (temp / "line_transitions.cpp").write_text(power + brightness + transitions)
+            render = (ROOT / "wled00/FX_fcn.cpp").read_text()
+            mask = render[render.index("    const auto compositePixel ="):render.index("    const auto setMirroredPixel =", render.index("    const auto compositePixel ="))]
+            (temp / "line_mask.cpp").write_text("""
+void checkMask(int lineLit, bool lineFromStart) {
+  Segment topSegment; topSegment.start = 7;
+  const int length = 105, cct = 127;
+  uint32_t _pixels[120] = {}; uint8_t* _pixelCCT = nullptr;
+  const auto color_blend = [](uint32_t, uint32_t b, uint8_t) { return b; };
+  const auto segblend = [](uint32_t a, uint32_t) { return a; };
+""" + mask + """
+  for (int i = 0; i < length; i++) {
+    const uint32_t original = 0x00002000U + i; // colored pattern, never white
+    compositePixel(topSegment.start + i, original, 255);
+    const bool visible = lineLit < 0 || (lineFromStart ? i < lineLit : i >= length - lineLit);
+    assert(_pixels[topSegment.start + i] == (visible ? original : 0));
+  }
+}
+""")
             presets = (ROOT / "wled00/presets.cpp").read_text()
             line_guard = presets[presets.index("#ifdef SAULUX\n"):presets.index("  //HTTP API commands")]
             (temp / "line_preset.cpp").write_text(

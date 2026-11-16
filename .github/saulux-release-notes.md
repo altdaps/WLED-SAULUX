@@ -6,9 +6,12 @@ Two-ended white light lines can use API presets `{"sauluxLine":"start","tt":20}`
 and `{"sauluxLine":"end","tt":20}`. Each toggles from the current light state,
 with white filling from that endpoint and darkness returning towards it. Assign
 presets to the endpoint buttons; `tt:20` is a 2-second full pass. During a pass,
-either button reverses the existing boundary without moving the white anchor or
+either button reverses the existing boundary without moving the illuminated side or
 changing its speed. Repeated presses reverse it again, with no queued action.
-The lit portion keeps a steady brightness, avoiding a full-line flash or fade.
+Switching off preserves the running effect and its palette instead of replacing it
+with white. A reversal reveals the same effect without restarting its runtime.
+A new ON pass from fully off still selects white. The visible portion keeps its
+brightness, avoiding a full-line flash or fade.
 
 Button state publishing is available at `<Device Topic>/input/1/state` and subsequent
 one-based input numbers: `1` = pressed, `0` = released. Enable MQTT and **Publish on

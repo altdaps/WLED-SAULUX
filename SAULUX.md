@@ -3,7 +3,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.5`.
+are not included. Fork releases use versions such as `16.0.1-saulux.6`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -90,13 +90,16 @@ long and double press for that button to act immediately on the rising edge.
 The command reads the current light state: when off, white fills from the pressed
 endpoint; when on, darkness travels back towards that endpoint. Both buttons share
 the light state, so turning on at one end and off at the other works. The command
-selects Solid, uses the dedicated white channel on RGBW strips (RGB white otherwise),
-removes segment reverse/mirror and cancels a nightlight. Existing brightness and LED
-boundaries are retained; segment opacity is set to full. It controls the master
-power and main segment, and is intended for a single light line. During the curtain,
+preserves the current effect, palette, colors, speed, intensity, opacity and geometry
+when switching off. Darkness crosses the still-running effect without a white flash.
+Reversing the pass reveals the same effect without restarting its runtime.
+A new ON pass from fully off selects Solid white, using the dedicated W channel on
+RGBW strips (RGB white otherwise), with full segment opacity and no reverse/mirror.
+Existing master brightness and LED boundaries are retained, and a nightlight is cancelled.
+The command controls master power and main segment, and is intended for a single light line. During the curtain,
 either endpoint button reverses the moving boundary from its current position.
-The white anchor stays at the original endpoint until the pass finishes; changing
-anchors midway would cause a visual jump. The boundary keeps the same speed, so a
+The illuminated side stays at the original endpoint until the pass finishes; changing
+endpoints midway would cause a visual jump. The boundary keeps the same speed, so a
 half-completed fill takes half the full-pass time to return to off. Further presses
 reverse it again without queueing. A held button acts once until released.
 Once fully on or off, the next button selects the endpoint for a new full pass.
@@ -211,11 +214,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.5
-   git push origin saulux-v16.0.1-saulux.5
+   git tag saulux-v16.0.1-saulux.6
+   git push origin saulux-v16.0.1-saulux.6
    ```
 
-The tag suffix (`16.0.1-saulux.5` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.6` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

@@ -62,22 +62,28 @@ bool prepareSauluxLineToggle(JsonObject root) {
   if (target.isNull()) return false;
   target["id"] = strip.getMainSegmentId();
   target["on"] = true;
-  target["bri"] = 255;
-  target["fx"] = 0;
-  target["fxdef"] = false;
-  target["pal"] = 0;
-  target["rev"] = false;
-  target["mi"] = false;
-  target["frz"] = false;
-  JsonArray colors = target.createNestedArray("col");
-  JsonArray white = colors.createNestedArray();
-  if (white.isNull()) return false;
-  for (uint8_t channel = 0; channel < 4; channel++) {
-    if (!white.add((whiteChannel ? channel == 3 : channel < 3) ? 255 : 0)) return false;
-  }
-  for (uint8_t color = 1; color < 3; color++) {
-    JsonArray black = colors.createNestedArray();
-    for (uint8_t channel = 0; channel < 4; channel++) if (!black.add(0)) return false;
+  // OFF and reversals keep the running scene, including its palette, geometry,
+  // opacity and effect runtime. Only a new ON pass selects the default white scene.
+  if (!continuing && turnOn) {
+    target["bri"] = 255;
+    target["fx"] = 0;
+    target["fxdef"] = false;
+    target["pal"] = 0;
+    target["rev"] = false;
+    target["mi"] = false;
+    target["frz"] = false;
+    JsonArray colors = target.createNestedArray("col");
+    JsonArray white = colors.createNestedArray();
+    if (white.isNull()) return false;
+    for (uint8_t channel = 0; channel < 4; channel++) {
+      if (!white.add((whiteChannel ? channel == 3 : channel < 3) ? 255 : 0)) return false;
+    }
+    for (uint8_t color = 1; color < 3; color++) {
+      JsonArray black = colors.createNestedArray();
+      for (uint8_t channel = 0; channel < 4; channel++) if (!black.add(0)) return false;
+    }
+  } else {
+    target["frz"] = segment.freeze; // restore a paused scene after global ON unfreezes segments
   }
   // Switching off runs the curtain back towards the endpoint that was pressed.
   if (!root["on"].set(turnOn)) return false;
