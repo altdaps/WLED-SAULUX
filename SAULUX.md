@@ -1,12 +1,14 @@
 # SAULUX firmware
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB flash and no PSRAM**.
-Each release contains three application images with preselected hardware profiles:
+Each release contains three application images with fixed hardware profiles:
 **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. A fresh installation
-configures its board immediately. Subsequent OTA updates preserve the saved profile,
-GPIO settings, Wi-Fi credentials and presets. An unconfigured universal installation
-(model 0) adopts the uploaded variant's default model. The web interface still allows
-changing the hardware profile when needed.
+configures its board immediately. The installed firmware determines the model;
+there is no model selector in the web interface. OTA updates for the same variant
+preserve GPIO settings, Wi-Fi credentials and presets. Upgrading a universal build
+or restoring a configuration cannot select another model. If the previously applied
+profile differs, this firmware initializes its own hardware defaults while keeping
+Wi-Fi credentials and presets.
 
 | Profile | Input GPIOs, in connector order | LED output GPIOs | Relay GPIO | Status GPIO |
 | --- | --- | --- | --- | --- |
@@ -40,16 +42,16 @@ outputs to SK6812 RGBW while keeping their GPIOs, counts, color order and power
 limits. This migration runs once; later explicit LED type changes remain saved.
 WLED project credits, license information and protocol names remain in the interface.
 
-## Select a device
+## Device configuration
 
-Connect over Wi-Fi (the access point is available on first installation). Open
-**Config → LED Preferences → SAULUX device**, select the model and click **Apply device**.
-The device saves the selection and restarts before configuring the new hardware.
-Changing the model resets LED outputs, inputs, relay and global I2C/SPI pins.
-It creates 30 SK6812 RGBW/GRBW LEDs per output, with consecutive logical LED ranges.
-Set the actual LED type, length, color order and current limits after selecting the model.
-Wi-Fi settings and stored presets are retained. Presets containing segment ranges
-may need adjustment to the new LED layout.
+Install the firmware matching your board: 2I2O, 5I4O or ETHERNET. The model is shown
+as read-only information in **Config → LED Preferences → SAULUX device**.
+Changing the model requires uploading the corresponding firmware image. When the
+previously applied model differs, LED outputs, inputs, relay and global I2C/SPI pins
+reset to that variant's defaults: 30 SK6812 RGBW/GRBW LEDs per output, with consecutive
+logical LED ranges. Set actual LED lengths, color order and current limits in LED
+Preferences. Wi-Fi settings and stored presets are retained; presets containing
+segment ranges may need adjustment after a hardware variant change.
 
 Initial input configuration is momentary buttons, **active LOW with internal pull-ups**.
 Change the button types and preset actions to match the connected equipment.
@@ -57,7 +59,7 @@ The relay defaults to **active HIGH**; its polarity is adjustable in Hardware se
 The status LED defaults to active HIGH and has an **active LOW** option in the SAULUX section.
 The status LED blinks at 1 Hz when connected and at 0.5 Hz in AP mode.
 PHY address and status polarity changes also restart the device, preserving the LED/input settings.
-The **Apply device** button applies only the SAULUX fields; **Save** applies other LED preferences.
+The **Apply settings** button applies only the PHY/status fields; **Save** applies other LED preferences.
 
 **Hardware verification is still required:** confirm input/relay polarity, PHY address,
 external REFCLK, actual flash capacity and boot strap levels (including GPIO12)
@@ -103,8 +105,8 @@ When upgrading from universal versions `saulux.4`–`saulux.6`, manually upload 
 ordinary `.bin` for your board once. **Leave firmware validation enabled:** all three
 variants retain `SAULUX` as the firmware compatibility identifier. The earlier
 universal update page cannot select the new variant filenames automatically.
-Your saved board profile and GPIO settings remain in use; the binary's default
-profile applies only to fresh or unconfigured installations.
+If the saved applied profile matches the firmware, GPIO settings are retained.
+A different or unconfigured profile is replaced with this firmware's hardware defaults.
 
 Earlier `saulux.1`–`saulux.3` builds use model-specific compatibility identifiers;
 their first manual upgrade to these variants may require **Ignore firmware validation**.
@@ -118,11 +120,11 @@ Keep validation enabled after that transition.
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v17.0.0-saulux.7
-   git push origin saulux-v17.0.0-saulux.7
+   git tag saulux-v17.0.0-saulux.8
+   git push origin saulux-v17.0.0-saulux.8
    ```
 
-The tag suffix (`17.0.0-saulux.7` here) becomes the firmware and asset version.
+The tag suffix (`17.0.0-saulux.8` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
@@ -138,10 +140,10 @@ open and connected to the device until the upload completes. Internet access is
 needed on the browser; the ESP32 itself does not need outbound internet access.
 Normal firmware validation stays enabled. Interrupted/failed downloads are not uploaded.
 
-Each board downloads the application matching its active hardware profile, exposed
+Each board downloads the application matching its compiled hardware variant, exposed
 as `otaRelease` in `/json/info`. The shared `release: "SAULUX"` field keeps normal
 firmware validation compatible across all three variants and the earlier universal
-build. Changing the model in the menu also changes the OTA target after reboot.
+build. Saved or restored model fields cannot redirect OTA to another variant.
 No firmware is downloaded from the upstream repository or the WLED proxy in SAULUX
 builds. Inherited upstream nightly publishing is disabled in this fork.
 
@@ -167,7 +169,8 @@ pio run -e esp32dev
 ```
 
 Host tests exercise the actual SAULUX implementation with hardware shims: all GPIO
-maps, model migration, retained settings, input validation and delayed reboot.
+maps for each fixed variant, migration from other profiles, retained settings, input
+validation and delayed reboot.
 Updater tests cover matching variants, missing images, failed requests and truncated
 downloads. Successful compilation checks the real ESP32 interfaces. Flashing, relay
 polarity, input behavior and Ethernet link operation must be tested on the boards.

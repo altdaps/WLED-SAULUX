@@ -30,10 +30,10 @@ class ProfileTests(unittest.TestCase):
             initial = re.search(r'  bool needsSave = false;\n#ifdef SAULUX\n.*?\n#endif', config, re.S)[0]
             usermods = re.search(r'  JsonObject usermods_settings = doc\["um"\];\n  if .*?\n  }', config, re.S)[0]
             (temp / "save_flag.cpp").write_text('bool configSaveHandoff(JsonObject doc, bool fromFS) {\n' + initial + '\n' + usermods + '\nreturn needsSave;\n}\n')
-            for model in range(4):
-                with self.subTest(default_model=model):
+            for model in range(1, 4):
+                with self.subTest(firmware_model=model):
                     binary = temp / f"profiles-{model}"
-                    subprocess.run([compiler, "-std=c++17", "-DSAULUX", f"-DSAULUX_DEFAULT_MODEL={model}",
+                    subprocess.run([compiler, "-std=c++17", "-DSAULUX", f"-DSAULUX_MODEL={model}",
                                     "-I" + str(temp), "-I" + str(ROOT / "test/saulux"),
                                     "-I" + str(ROOT / "wled00"), str(ROOT / "test/saulux/native.cpp"),
                                     "-o", str(binary)], check=True)

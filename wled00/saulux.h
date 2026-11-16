@@ -5,9 +5,8 @@
 bool prepareSauluxConfig(JsonObject root);
 bool makeSauluxHostname(char* buffer, size_t capacity);
 void serializeSauluxConfig(JsonObject root);
-enum class SauluxSelection { Invalid, Unchanged, Changed };
-SauluxSelection selectSauluxHardware(const String& model, const String& phyAddress, bool statusInverted);
-uint8_t getSauluxModel();
+enum class SauluxSettingsResult { Invalid, Unchanged, Changed };
+SauluxSettingsResult configureSauluxHardware(const String& phyAddress, bool statusInverted);
 const char* getSauluxOtaRelease();
 uint8_t getSauluxPhyAddress();
 bool getSauluxStatusInverted();

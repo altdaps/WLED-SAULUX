@@ -60,11 +60,11 @@ int main() {
     freshPins();
     DynamicJsonDocument document(16384);
     JsonObject root = document.to<JsonObject>();
-    root["saulux"]["model"] = 2;
-    root["saulux"]["applied"] = 2;
+    root["saulux"]["model"] = SAULUX_MODEL;
+    root["saulux"]["applied"] = SAULUX_MODEL;
     JsonArray buses = root["hw"]["led"].createNestedArray("ins");
     JsonObject bus = buses.createNestedObject();
-    bus.createNestedArray("pin").add(18);
+    bus.createNestedArray("pin").add(expectedOutputs[SAULUX_MODEL - 1][0]);
     bus["type"] = TYPE_WS2812_RGB;
     bus["len"] = 137;
     bus["order"] = 2;
@@ -72,7 +72,7 @@ int main() {
     buses.createNestedObject()["type"] = 42;
     assert(prepareSauluxConfig(root));
     assert(bus["type"] == TYPE_SK6812_RGBW);
-    assert(bus["pin"][0] == 18 && bus["len"] == 137);
+    assert(bus["pin"][0] == expectedOutputs[SAULUX_MODEL - 1][0] && bus["len"] == 137);
     assert(bus["order"] == 2 && bus["maxpwr"] == 1200);
     assert(buses[1]["type"] == 42);
     serializeSauluxConfig(root);
@@ -83,55 +83,16 @@ int main() {
     assert(!prepareSauluxConfig(root));
     assert(bus["type"] == TYPE_WS2812_RGB);
   }
-  // Fresh installs and unconfigured universal devices adopt the compiled variant.
-  for (bool unconfigured : {false, true}) {
+  // Fresh, universal and foreign model configurations all use the compiled GPIO map.
+  const int model = SAULUX_MODEL;
+  for (int stored : {-1, 0, 1, 2, 3, 999}) {
     freshPins();
     DynamicJsonDocument document(16384);
     JsonObject root = document.to<JsonObject>();
-    if (unconfigured) {
-      root["saulux"]["model"] = 0;
-      root["saulux"]["applied"] = 0;
-      root["saulux"]["ledDefaults"] = 1;
-      root["id"]["name"] = "SAULUX";
-      root["id"]["mdns"] = "saulux-123456";
-      root["ap"]["ssid"] = "saulux-123456";
-    }
-    assert(prepareSauluxConfig(root) == (!unconfigured || SAULUX_DEFAULT_MODEL != 0));
-    assert(getSauluxModel() == SAULUX_DEFAULT_MODEL);
-    assert(std::string(getSauluxOtaRelease()) == expectedRelease[SAULUX_DEFAULT_MODEL]);
-    if (SAULUX_DEFAULT_MODEL == 0) {
-      assert(root["hw"]["led"]["ins"].size() == 0);
-      assert(root["hw"]["btn"]["ins"].size() == 0);
-      assert(PinManager::allocated.empty());
-    } else {
-      assert(root["hw"]["led"]["ins"][0]["pin"][0] == expectedOutputs[SAULUX_DEFAULT_MODEL - 1][0]);
-      assert(root["hw"]["led"]["ins"][0]["type"] == TYPE_SK6812_RGBW);
-      assert(root["hw"]["relay"]["pin"] == expectedRelay[SAULUX_DEFAULT_MODEL - 1]);
-      assert(root["eth"]["type"] == (SAULUX_DEFAULT_MODEL == 3 ? 7 : 0));
-    }
-    serializeSauluxConfig(root);
-    freshPins();
-    assert(!prepareSauluxConfig(root));
-    const int next = SAULUX_DEFAULT_MODEL == 3 ? 1 : 3;
-    assert(selectSauluxHardware(next == 1 ? "1" : "3", "1", false) == SauluxSelection::Changed);
-    // OTA selection follows running GPIOs until the saved change is applied on reboot.
-    assert(std::string(getSauluxOtaRelease()) == expectedRelease[SAULUX_DEFAULT_MODEL]);
-    serializeSauluxConfig(root);
-    assert(root["saulux"]["applied"] == SAULUX_DEFAULT_MODEL);
-    freshPins();
-    assert(prepareSauluxConfig(root));
-    assert(getSauluxModel() == next);
-    assert(std::string(getSauluxOtaRelease()) == expectedRelease[next]);
-    assert(root["hw"]["led"]["ins"][0]["pin"][0] == expectedOutputs[next - 1][0]);
-  }
-  for (int model = 1; model <= 3; model++) {
-    freshPins();
-    DynamicJsonDocument document(16384);
-    JsonObject root = document.to<JsonObject>();
-    root["saulux"]["model"] = model;
+    if (stored >= 0) root["saulux"]["model"] = stored;
+    if (stored != model) root["saulux"]["applied"] = stored;
     root["nw"]["ins"][0]["ssid"] = "keep-wifi";
     assert(prepareSauluxConfig(root));
-    assert(getSauluxModel() == model);
     assert(std::string(getSauluxOtaRelease()) == expectedRelease[model]);
     assert(statusPin == expectedStatus[model - 1]);
     assert(root["eth"]["type"] == (model == 3 ? 7 : 0));
@@ -159,30 +120,33 @@ int main() {
     }
     assert(inputs.size() == inputCount);
     assert(root["hw"]["relay"]["pin"] == expectedRelay[model - 1]);
+    assert(root["hw"]["relay"]["rev"] == false);
     if (expectedRelay[model - 1] >= 0) assert(pins.insert(expectedRelay[model - 1]).second);
     if (model == 3) {
       for (int pin : {25,26,27,0,5,18,19,21,22,23}) assert(pins.insert(pin).second);
     }
     assert(root["nw"]["ins"][0]["ssid"] == "keep-wifi");
-    root["hw"]["led"]["ins"][0]["len"] = 123;
+    buses[0]["len"] = 123;
     serializeSauluxConfig(root);
+    assert(root["saulux"]["model"] == model && root["saulux"]["applied"] == model);
     freshPins();
     assert(!prepareSauluxConfig(root));
-    assert(root["hw"]["led"]["ins"][0]["len"] == 123);
-    const char* next = model == 1 ? "2" : "1";
-    assert(selectSauluxHardware(next, "1", false) == SauluxSelection::Changed);
-    serializeSauluxConfig(root);
-    assert(root["saulux"]["applied"] == model);
+    assert(buses[0]["len"] == 123);
+    // An old pending menu selection cannot change either running hardware or future OTA.
+    root["saulux"]["model"] = model == 1 ? 2 : 1;
     freshPins();
     assert(prepareSauluxConfig(root));
-    assert(getSauluxModel() == (model == 1 ? 2 : 1));
-    assert(root["hw"]["led"]["ins"][0]["len"] == 30);
+    assert(buses[0]["len"] == 123);
+    assert(std::string(getSauluxOtaRelease()) == expectedRelease[model]);
+    serializeSauluxConfig(root);
+    assert(root["saulux"]["model"] == model);
   }
-  for (const char* bad : {"", "0", "4", "-1", "1x", "256", " 1"}) assert(selectSauluxHardware(bad, "1", false) == SauluxSelection::Invalid);
-  for (const char* bad : {"", "-1", "32", "256", "1x", " 1"}) assert(selectSauluxHardware("1", bad, false) == SauluxSelection::Invalid);
-  assert(selectSauluxHardware("3", "31", true) == SauluxSelection::Changed);
+  for (const char* bad : {"", "-1", "32", "256", "1x", " 1"}) assert(configureSauluxHardware(bad, false) == SauluxSettingsResult::Invalid);
+  assert(configureSauluxHardware("31", true) == SauluxSettingsResult::Changed);
+  assert(configureSauluxHardware("31", true) == SauluxSettingsResult::Unchanged);
   assert(getSauluxPhyAddress() == 31);
   assert(getSauluxStatusInverted());
+  assert(std::string(getSauluxOtaRelease()) == expectedRelease[model]);
   configNeedsWrite = true;
   doReboot = false;
   handleSauluxReboot();
@@ -196,7 +160,6 @@ int main() {
   root["saulux"]["phyAddress"] = 999;
   freshPins();
   assert(prepareSauluxConfig(root));
-  assert(getSauluxModel() == SAULUX_DEFAULT_MODEL);
   assert(getSauluxPhyAddress() == 1);
   // A complete usermod config must not erase the profile migration's save request.
   for (bool complete : {true, false}) {
