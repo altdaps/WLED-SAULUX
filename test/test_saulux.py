@@ -54,6 +54,25 @@ class ProfileTests(unittest.TestCase):
                             str(ROOT / "test/saulux/ota_native.cpp"), "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
 
+    def test_native_mqtt_inputs(self):
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        self.assertIsNotNone(compiler, "A host C++ compiler is required")
+        with tempfile.TemporaryDirectory() as folder:
+            temp = Path(folder)
+            source = (ROOT / "wled00/saulux_mqtt.cpp").read_text()
+            (temp / "mqtt_runtime.cpp").write_text(source.replace('#include "wled.h"', '#include "mqtt_shim.h"'))
+            buttons = (ROOT / "wled00/button.cpp").read_text()
+            reader = buttons[buttons.index("bool isButtonPressed("):buttons.index("void handleSwitch(")]
+            (temp / "button_read.cpp").write_text(reader)
+            for model in range(1, 4):
+                with self.subTest(firmware_model=model):
+                    binary = temp / f"mqtt-{model}"
+                    subprocess.run([compiler, "-std=c++17", "-DSAULUX", f"-DSAULUX_MODEL={model}",
+                                    "-I" + str(temp), "-I" + str(ROOT / "test/saulux"),
+                                    "-I" + str(ROOT / "wled00"), str(ROOT / "test/saulux/mqtt_native.cpp"),
+                                    "-o", str(binary)], check=True)
+                    subprocess.run([str(binary)], check=True)
+
 
 class ReleaseTests(unittest.TestCase):
     def test_prepare_rejects_invalid_tags(self):

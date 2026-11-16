@@ -13,5 +13,9 @@ bool getSauluxStatusInverted();
 void handleSauluxReboot();
 void setupSauluxStatus();
 void handleSauluxStatus();
+#ifndef WLED_DISABLE_MQTT
+void onSauluxMqttConnect();
+void handleSauluxMqttInputs();
+#endif
 // AI: end
 #endif

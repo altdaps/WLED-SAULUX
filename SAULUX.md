@@ -3,7 +3,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.1`.
+are not included. Fork releases use versions such as `16.0.1-saulux.2`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -72,6 +72,40 @@ The **Apply settings** button applies only the PHY/status fields; **Save** appli
 external REFCLK, actual flash capacity and boot strap levels (including GPIO12)
 on the real boards before use. Local tests and firmware compilation do not establish
 correct electrical operation.
+
+## Button states over MQTT
+
+Configure the broker and **Device Topic** in **Config → Sync Interfaces → MQTT**,
+enable MQTT and **Publish on button press**, save and reboot. The SAULUX publisher
+uses the configured device topic; the AP/mDNS hostname does not replace this setting.
+
+Each physical input publishes a logical state in its connector order:
+
+| Hardware | State topics |
+| --- | --- |
+| SAULUX 2I2O | `<Device Topic>/input/1/state` through `/input/2/state` |
+| SAULUX 5I4O | `<Device Topic>/input/1/state` through `/input/5/state` |
+| SAULUX ETHERNET | `<Device Topic>/input/1/state` through `/input/2/state` |
+
+Payload **`1` means pressed**, **`0` means released**. The default active-LOW wiring
+therefore publishes `1` when the input is pulled to ground. A configured active-HIGH
+button uses its corresponding logical polarity. States follow the first configured
+button entries, in the same order as the board connectors by default.
+
+States are debounced for 50 ms, published at QoS 1 and retained independently of the
+brightness/color retain option. The device sends an initial snapshot and refreshes
+all input states after every MQTT connection. It publishes subsequent changes
+without repeating messages while a button is held. Rejected queue entries are
+retried with a bounded interval using the latest state.
+
+Disabling a button, changing it to an unsupported type such as analog, or disabling
+**Publish on button press** clears the corresponding retained input states when the
+broker is connected. Existing `button/0`, `button/1`, etc. click events (`short`,
+`long`, `double`) and local button actions are preserved; their numbering starts
+at zero. These event topics are separate from the new one-based input state topics.
+
+Retained input values describe the last known state. Consumers should also use
+`<Device Topic>/status` (`online` / `offline`) for device availability.
 
 ## Build locally
 
@@ -143,11 +177,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.1
-   git push origin saulux-v16.0.1-saulux.1
+   git tag saulux-v16.0.1-saulux.2
+   git push origin saulux-v16.0.1-saulux.2
    ```
 
-The tag suffix (`16.0.1-saulux.1` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.2` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

@@ -239,6 +239,9 @@ void WLED::loop()
   handleWs();
 #ifdef SAULUX
   handleSauluxStatus();
+#ifndef WLED_DISABLE_MQTT
+  handleSauluxMqttInputs();
+#endif
 #endif
 #if defined(STATUSLED)
   handleStatusLED();
