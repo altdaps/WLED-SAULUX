@@ -1,6 +1,8 @@
 # SAULUX firmware
 
-This fork builds firmware for ESP32-WROOM-32 modules with **4 MB flash and no PSRAM**.
+This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
+no PSRAM**. The three variants share a **4 MB flash layout** so the
+same model-specific image can be installed on either flash capacity.
 Each release contains three application images with fixed hardware profiles:
 **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. A fresh installation
 configures its board immediately. The installed firmware determines the model;
@@ -85,6 +87,16 @@ Outputs are written to `build_output/release/`:
 | SAULUX 2I2O | `WLED_<version>_SAULUX_2I2O.bin` |
 | SAULUX 5I4O | `WLED_<version>_SAULUX_5I4O.bin` |
 | SAULUX ETHERNET | `WLED_<version>_SAULUX_ETHERNET.bin` |
+
+The shared partition table is `tools/WLED_ESP32_4MB_1MB_FS.csv`: two 1.5 MiB OTA
+application slots and a 960 KiB filesystem, all within the first 4 MiB. On an 8 MB
+module installed with the factory image, the additional 4 MiB is unused. A larger
+flash chip alone does not enlarge the firmware slots or filesystem. No separate
+8 MB binaries or flash-size menu selection are needed for this layout.
+
+Ordinary OTA application updates do not replace the installed partition table.
+Using the full 8 MB would require an 8 MB layout and a separate installation/migration
+plan; it is not enabled by these shared images.
 
 Each has a corresponding `_factory.bin` image with bootloader and partitions for
 first serial flashing at offset `0x0`.
