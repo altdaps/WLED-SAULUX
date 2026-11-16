@@ -81,11 +81,11 @@ The first SAULUX boot replaces the hardware mapping with the selected profile.
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v17.0.0-saulux.1
-   git push origin saulux-v17.0.0-saulux.1
+   git tag saulux-v17.0.0-saulux.3
+   git push origin saulux-v17.0.0-saulux.3
    ```
 
-The tag suffix (`17.0.0-saulux.1` here) becomes the firmware and asset version.
+The tag suffix (`17.0.0-saulux.3` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests all

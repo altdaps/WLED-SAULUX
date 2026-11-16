@@ -29,4 +29,9 @@ inline struct NetworkStub {
   bool connected = false;
   bool isConnected() const { return connected; }
 } WLEDNetwork;
+namespace UsermodManager {
+inline bool complete = true;
+inline unsigned reads = 0;
+inline bool readFromConfig(JsonObject&) { reads++; return complete; }
+}
 // AI: end

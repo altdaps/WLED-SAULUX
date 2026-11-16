@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -24,6 +25,11 @@ class ProfileTests(unittest.TestCase):
             # Compile the actual firmware implementation, replacing only its hardware include.
             source = (ROOT / "wled00/saulux.cpp").read_text()
             (temp / "saulux_runtime.cpp").write_text(source.replace('#include "wled.h"', '#include "native_shim.h"'))
+            # Exercise the actual config save-flag handoff, including the usermod reader.
+            config = (ROOT / "wled00/cfg.cpp").read_text()
+            initial = re.search(r'  bool needsSave = false;\n#ifdef SAULUX\n.*?\n#endif', config, re.S)[0]
+            usermods = re.search(r'  JsonObject usermods_settings = doc\["um"\];\n  if .*?\n  }', config, re.S)[0]
+            (temp / "save_flag.cpp").write_text('bool configSaveHandoff(JsonObject doc, bool fromFS) {\n' + initial + '\n' + usermods + '\nreturn needsSave;\n}\n')
             binary = temp / "profiles"
             subprocess.run([compiler, "-std=c++17", "-DSAULUX", "-DSAULUX_DEFAULT_MODEL=1",
                             "-I" + str(temp), "-I" + str(ROOT / "test/saulux"),

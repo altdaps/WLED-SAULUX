@@ -812,7 +812,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   DEBUG_PRINTLN(F("Starting usermod config."));
   JsonObject usermods_settings = doc["um"];
   if (!usermods_settings.isNull()) {
-    needsSave = !UsermodManager::readFromConfig(usermods_settings);
+    needsSave |= !UsermodManager::readFromConfig(usermods_settings);
   }
 
   if (fromFS) return needsSave;

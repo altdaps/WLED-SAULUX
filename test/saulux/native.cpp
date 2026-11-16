@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include "saulux_runtime.cpp"
+#include "save_flag.cpp"
 
 static void freshPins() {
   statusPin = -1;
@@ -84,6 +85,21 @@ int main() {
   assert(prepareSauluxConfig(root));
   assert(getSauluxModel() == SAULUX_DEFAULT_MODEL);
   assert(getSauluxPhyAddress() == 1);
+  // A complete usermod config must not erase the profile migration's save request.
+  for (bool complete : {true, false}) {
+    freshPins();
+    document.clear();
+    root = document.to<JsonObject>();
+    root.createNestedObject("um");
+    UsermodManager::complete = complete;
+    const unsigned before = UsermodManager::reads;
+    assert(configSaveHandoff(root, true));
+    assert(UsermodManager::reads == before + 1);
+    serializeSauluxConfig(root);
+    freshPins();
+    assert(configSaveHandoff(root, true) == !complete);
+    assert(UsermodManager::reads == before + 2);
+  }
   std::cout << "Profiles, GPIO conflicts, persistence, reboot and validation passed\n";
 }
 // AI: end
