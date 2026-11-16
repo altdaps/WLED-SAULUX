@@ -1,4 +1,5 @@
 #include "wled.h"
+#include "saulux.h"
 #include "fcn_declare.h"
 #include "wled_ethernet.h"
 
@@ -213,6 +214,9 @@ bool initEthernet()
 
   // Ethernet initialization should only succeed once -- else reboot required
   ethernet_settings es = ethernetBoards[ethernetType];
+#ifdef SAULUX
+  if (ethernetType == WLED_ETH_ESP32ETHKITVE) es.eth_address = getSauluxPhyAddress();
+#endif
   managed_pin_type pinsToAllocate[10] = {
     // first six pins are non-configurable
     esp32_nonconfigurable_ethernet_pins[0],

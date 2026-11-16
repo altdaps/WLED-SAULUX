@@ -1248,6 +1248,19 @@ Swap: <select id="xw${s}" name="XW${s}">
 	<div class="helpB"><button type="button" onclick="H('features/settings/#led-settings')">?</button></div>
 	<button type="button" onclick="B()">Back</button><button type="submit">Save</button><hr>
 	</div>
+	<div id="saulux" class="hide sec">
+		<h2>SAULUX device</h2>
+		<label>Model: <select name="SXM">
+			<option value="1">SAULUX 2I2O</option>
+			<option value="2">SAULUX 5I4O</option>
+			<option value="3">SAULUX ETHERNET</option>
+		</select></label>
+		<br><label>Ethernet PHY address: <input name="SXA" type="number" min="0" max="31" value="1"></label>
+		<br><label>Status LED active LOW: <input name="SXI" type="checkbox"></label>
+		<p>Changing model and saving restarts the device and resets LED outputs,
+			inputs and relay to that model's defaults (30 WS2812 LEDs per output).
+			Wi-Fi and presets are kept. Configure LED lengths and input types after restart.</p>
+	</div>
 	<h2>LED setup</h2>
 	<div class="sec">
 		Total LEDs: <span id="lc">?</span> <span id="pc"></span><br>

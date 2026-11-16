@@ -8,6 +8,10 @@ on:
         description: 'Build the release env matrix (uses .github/platformio_release.ini.template)'
         type: boolean
         default: false
+      saulux_release:
+        description: 'Use the saulux-vX.Y.Z tag as firmware version'
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -54,6 +58,9 @@ jobs:
       with:
         node-version-file: '.nvmrc'
         cache: 'npm'
+    - name: Set SAULUX release version
+      if: inputs.saulux_release
+      run: python3 tools/saulux_release.py prepare "$GITHUB_REF_NAME"
     - run: |
         npm ci
         VERSION=`date +%y%m%d0`
@@ -64,9 +71,8 @@ jobs:
         path: |
               ~/.platformio/.cache
               ~/.buildcache
-              build_output
-        key: pio-${{ runner.os }}-${{ matrix.environment }}-${{ hashFiles('platformio.ini', '.github/platformio_release.ini.template', 'pio-scripts/output_bins.py') }}-${{ hashFiles('wled00/**', 'usermods/**') }}
-        restore-keys: pio-${{ runner.os }}-${{ matrix.environment }}-${{ hashFiles('platformio.ini', '.github/platformio_release.ini.template', 'pio-scripts/output_bins.py') }}-
+        key: pio-${{ runner.os }}-${{ matrix.environment }}-${{ hashFiles('platformio*.ini', '.github/platformio_release.ini.template', 'pio-scripts/*.py') }}-${{ hashFiles('wled00/**', 'usermods/**') }}
+        restore-keys: pio-${{ runner.os }}-${{ matrix.environment }}-${{ hashFiles('platformio*.ini', '.github/platformio_release.ini.template', 'pio-scripts/*.py') }}-
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -95,6 +101,7 @@ jobs:
         fi
     - uses: actions/upload-artifact@v4
       with:
+        if-no-files-found: error
         name: ${{ steps.artifact_name.outputs.name }}
         path: |
           build_output/release/*.bin
@@ -113,3 +120,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm test
+      - name: Set up Python for SAULUX checks
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test SAULUX profiles and release packaging
+        run: python3 -m unittest discover -s test -p 'test_saulux.py'

@@ -1,48 +1,69 @@
-name: WLED Release CI
+name: SAULUX Release
 
 on:
   push:
     tags:
-      - '*'
+      - 'saulux-v*'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  contents: read
+
+concurrency:
+  group: saulux-release
+  cancel-in-progress: false
 
 jobs:
-  
-  wled_build:
+  build:
+    name: Build three SAULUX variants
     uses: ./.github/workflows/build.yml
     with:
-      release: true
-    
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: wled_build
-    steps:
-    - uses: actions/download-artifact@v4
-      with:
-        merge-multiple: true
-    - name: Create draft release
-      uses: softprops/action-gh-release@v1
-      with:
-        body: "Release assets uploaded. Release notes pending..."
-        draft: True
-        files: |
-          *.bin
-          *.bin.gz
-    - name: "✏️ Generate release changelog"
-      id: changelog
-      uses: janheinrichmerker/action-github-changelog-generator@v2.4
-      with:
-          token: ${{ secrets.GITHUB_TOKEN }} 
-          sinceTag: v0.15.0
-          maxIssues: 500
-          # Exclude issues that were closed without resolution from changelog
-          excludeLabels: 'stale,wontfix,duplicate,invalid,external,question,use-as-is,not_planned'       
-    - name: Update release description
-      uses: softprops/action-gh-release@v1
-      with:
-        body: ${{ steps.changelog.outputs.changelog }}
-        draft: True
+      saulux_release: true
 
+  release:
+    name: Publish firmware release
+    runs-on: ubuntu-24.04
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set release version
+        run: python3 tools/saulux_release.py prepare "$GITHUB_REF_NAME"
+      - name: Download firmware
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-SAULUX_*
+          path: build_output/release
+          merge-multiple: true
+      - name: Validate binaries and create OTA manifest
+        run: python3 tools/saulux_release.py package
+      - name: Publish release in this repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.bin dist/SHA256SUMS dist/manifest.json \
+            --verify-tag --title "$GITHUB_REF_NAME" --generate-notes --latest
+      - name: Upload OTA site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Publish OTA files to GitHub Pages
+    runs-on: ubuntu-24.04
+    needs: release
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy OTA site
+        id: deployment
+        uses: actions/deploy-pages@v4

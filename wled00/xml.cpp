@@ -1,4 +1,5 @@
 #include "wled.h"
+#include "saulux.h"
 #include "wled_ethernet.h"
 
 /*
@@ -335,6 +336,12 @@ void getSettingsJS(byte subPage, Print& settingsScript)
 
   if (subPage == SUBPAGE_LEDS)
   {
+#ifdef SAULUX
+    printSetFormValue(settingsScript, PSTR("SXM"), getSauluxModel());
+    printSetFormValue(settingsScript, PSTR("SXA"), getSauluxPhyAddress());
+    printSetFormCheckbox(settingsScript, PSTR("SXI"), getSauluxStatusInverted());
+    settingsScript.print(F("gId('saulux').classList.remove('hide');"));
+#endif
     appendGPIOinfo(settingsScript);
 
     settingsScript.printf_P(PSTR("d.ledTypes=%s;"), BusManager::getLEDTypesJSONString().c_str());

@@ -24,6 +24,7 @@ replace_fs.py
 wled-update.sh
 
 /build_output/
+/dist/
 /node_modules/
 /logs/
 

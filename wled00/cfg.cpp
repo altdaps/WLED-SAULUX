@@ -1,4 +1,5 @@
 #include "wled.h"
+#include "saulux.h"
 #include "wled_ethernet.h"
 #include "bus_wrapper.h"
 
@@ -47,6 +48,9 @@ static inline void getStringFromJson(char* dest, const char* src, size_t len) {
 
 bool deserializeConfig(JsonObject doc, bool fromFS) {
   bool needsSave = false;
+#ifdef SAULUX
+  if (fromFS) needsSave = prepareSauluxConfig(doc);
+#endif
   //int rev_major = doc["rev"][0]; // 1
   //int rev_minor = doc["rev"][1]; // 0
 
@@ -860,6 +864,9 @@ bool deserializeConfigFromFS() {
   // NOTE: This routine deserializes *and* applies the configuration
   //       Therefore, must also initialize ethernet from this function
   JsonObject root = pDoc->as<JsonObject>();
+#ifdef SAULUX
+  if (root.isNull()) root = pDoc->to<JsonObject>();
+#endif
   bool needsSave = deserializeConfig(root, true);
   releaseJSONBufferLock();
 
@@ -897,6 +904,9 @@ static void __attribute__((noinline)) setConfigValue(JsonObject object, const __
 }
 
 void serializeConfig(JsonObject root) {
+#ifdef SAULUX
+  serializeSauluxConfig(root);
+#endif
   JsonArray rev = root.createNestedArray("rev");
   rev.add(1); //major settings revision
   rev.add(0); //minor settings revision

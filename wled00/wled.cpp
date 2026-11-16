@@ -1,5 +1,6 @@
 #define WLED_DEFINE_GLOBAL_VARS //only in one source file, wled.cpp!
 #include "wled.h"
+#include "saulux.h"
 #include "wled_ethernet.h"
 #ifdef ARDUINO_ARCH_ESP32
 #include "esp_efuse.h"
@@ -252,9 +253,15 @@ void WLED::loop()
   }
   yield();
   if (configNeedsWrite) serializeConfigToFS();
+#ifdef SAULUX
+  handleSauluxReboot();
+#endif
 
   yield();
   handleWs();
+#ifdef SAULUX
+  handleSauluxStatus();
+#endif
 #if defined(STATUSLED)
   handleStatusLED();
 #endif
@@ -527,6 +534,9 @@ void WLED::setup()
   }
   DEBUG_PRINTLN(F("Reading config"));
   bool needsCfgSave = deserializeConfigFromFS();
+#ifdef SAULUX
+  setupSauluxStatus();
+#endif
   DEBUG_PRINTF_P(PSTR("heap %u\n"), getFreeHeapSize());
 
 #if defined(STATUSLED) && STATUSLED>=0
