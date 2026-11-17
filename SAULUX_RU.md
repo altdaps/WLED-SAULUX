@@ -1,7 +1,7 @@
 # SAULUX — руководство по установке, настройке и управлению
 
 Руководство для форка [altdaps/WLED-SAULUX](https://github.com/altdaps/WLED-SAULUX).
-Описанное поведение соответствует **16.0.1-saulux.12**, включая независимые переходы нескольких сегментов.
+Описанное поведение соответствует **16.0.1-saulux.13**, включая независимые переходы нескольких сегментов.
 
 Прошивка основана на официальной **WLED 16.0.1**, использует **ESP-IDF 4.4 / Arduino 2**
 и предназначена для **ESP32-WROOM-32 без PSRAM**, с физической flash-памятью **4 или 8 МБ**.
@@ -126,13 +126,13 @@
 <a name="firmware-files"></a>
 ## 3. Выбор файла прошивки и объёма flash
 
-Пример имён файлов для версии `16.0.1-saulux.12`:
+Пример имён файлов для версии `16.0.1-saulux.13`:
 
 | Модель | Для OTA | Для первой установки через USB / UART |
 | --- | --- | --- |
-| 2I2O | `WLED_16.0.1-saulux.12_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.12_SAULUX_2I2O_factory.bin` |
-| 5I4O | `WLED_16.0.1-saulux.12_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.12_SAULUX_5I4O_factory.bin` |
-| ETHERNET | `WLED_16.0.1-saulux.12_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.12_SAULUX_ETHERNET_factory.bin` |
+| 2I2O | `WLED_16.0.1-saulux.13_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.13_SAULUX_2I2O_factory.bin` |
+| 5I4O | `WLED_16.0.1-saulux.13_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.13_SAULUX_5I4O_factory.bin` |
+| ETHERNET | `WLED_16.0.1-saulux.13_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.13_SAULUX_ETHERNET_factory.bin` |
 
 В релизе находятся **три варианта прошивки**, каждый в обычном и factory-исполнении,
 а также `SHA256SUMS` и `manifest.json`.
@@ -173,7 +173,7 @@
 Пример для SAULUX ETHERNET и современного `esptool`:
 
 ```sh
-python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.12_SAULUX_ETHERNET_factory.bin
+python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.13_SAULUX_ETHERNET_factory.bin
 ```
 
 Замените порт и имя файла. В Linux порт может иметь вид `/dev/ttyUSB0`, в Windows — `COM4`.
@@ -689,6 +689,22 @@ curl --fail --silent --show-error \
 включение/выключение, яркость и цвет; скрипты запуска пресетов отдельно выбирать не требуется.
 [Освещение в Yandex Smart Home](https://docs.yaha-cloud.ru/v1.1.x/devices/light/).
 
+### Плавные изменения цвета и эффекта через Outside In
+
+На контроллере задайте длительность по умолчанию **1 секунда** и стиль перехода
+**Outside In** (`"bs":4`). В JSON `transition` и `tt` измеряются в десятых долях
+секунды: используйте `10`. Параметр `transition` в сервисе HA `light.turn_on`
+измеряется в секундах: используйте `1`, а не `0`.
+
+Для пресетов с эффектами проверьте собственные `tt`, `transition` и `bs`:
+сохранённое `"tt":0` явно отключает переход, даже если задана общая длительность.
+В загрузочном пресете также сохраните нужные значения, чтобы стиль применялся после перезапуска.
+
+Питание Centr 2 по-прежнему использует проход от центра и обратно за 1 секунду.
+Цвет и эффект заменяются через Outside In за 1 секунду. Начиная с **16.0.1-saulux.13**,
+`sauluxLineKeep` разрешает штатное смешивание старой и новой сцен внутри маски питания:
+изменение цвета и выбор эффекта не становятся мгновенными во время заполнения или разворота.
+
 ### Пресет отсутствует в списке HA
 
 Проверьте его запись в `http://<IP>/presets.json`. Для команды линии указывайте
@@ -945,9 +961,9 @@ pio run -e saulux_ethernet
 затем подготовьте версию пакета и соберите интерфейс до прошивки:
 
 ```sh
-git checkout saulux-v16.0.1-saulux.12
+git checkout saulux-v16.0.1-saulux.13
 npm ci
-python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.12
+python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.13
 npm run build
 pio run
 ```
@@ -969,23 +985,23 @@ pio run -e esp32dev
 
 ### Выпуск через GitHub Actions
 
-Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.12`.
+Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.13`.
 Тег должен соответствовать базовой версии исходников; новую версию выпускают новым тегом.
 
 Порядок выпуска следующей версии:
 
 1. Сохраните и отправьте изменения в свой репозиторий.
-2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.13`, и отправьте его.
+2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.14`, и отправьте его.
 3. Дождитесь успешного workflow **SAULUX Release**.
 4. Проверьте три OTA-файла, три factory-файла и `SHA256SUMS` в Releases.
 5. Дождитесь успешного развёртывания Pages и проверьте `manifest.json`.
 
-Пример команд для будущей версии `.13`, если её тег ещё не существует:
+Пример команд для будущей версии `.14`, если её тег ещё не существует:
 
 ```sh
 git push origin main
-git tag saulux-v16.0.1-saulux.13
-git push origin saulux-v16.0.1-saulux.13
+git tag saulux-v16.0.1-saulux.14
+git push origin saulux-v16.0.1-saulux.14
 ```
 
 Если запуск по тегу не произошёл, используйте **Actions → SAULUX Release → Run workflow**

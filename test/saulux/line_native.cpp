@@ -181,6 +181,7 @@ void checkKeepScene() {
   assert(segment.on && segment.colors[0] == 0x123456 && segment.opacity == 77);
   assert(segment.mode == 65 && segment.palette == 11 && segment.runtime == 999);
   assert(segment.reverse && segment.mirror);
+  assert(getSauluxLineMask(segment, 35).blendScene);
   tick = 400; const int before = pixels(0);
   strip.segments[1].on = false; assert(command(1));
   DynamicJsonDocument doc(2048); auto root = doc.to<JsonObject>();
@@ -190,7 +191,9 @@ void checkKeepScene() {
   cancelSauluxLineTransitions(root);
   assert(isSauluxLineTransition(segment) && pixels(0) == before);
   assert(!isSauluxLineTransition(strip.segments[1])); // default mode still yields to master brightness
+  segment.transitioning = true; // a native color transition is already running
   assert(command(0, "edges")); // reversal retains keep mode, shape and original scene
+  assert(segment.transitioning); // do not cut short the native color transition
   assert(!segment.on && pixels(0) == before);
   root.clear(); root["seg"]["id"] = 0; root["seg"]["col"][0][2] = 255;
   cancelSauluxLineTransitions(root); assert(isSauluxLineTransition(segment));
@@ -295,6 +298,7 @@ void checkGeometries() {
       for (int lit = 0; lit <= length; lit++) {
         tick = (uint32_t(lit) * 65500 + length / 2) / length;
         const auto mask = getSauluxLineMask(segment, length);
+        assert(!mask.blendScene); // ordinary passes retain their original rendering
         assert(mask.active && mask.start <= mask.stop && mask.stop <= unsigned(length));
         assert(int(mask.outside ? length - (mask.stop - mask.start) : mask.stop - mask.start) == lit);
         std::vector<bool> visible(length, false);

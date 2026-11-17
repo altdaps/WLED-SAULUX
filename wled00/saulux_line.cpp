@@ -72,6 +72,7 @@ SauluxLineMask getSauluxLineMask(const Segment& segment, unsigned length) {
   if (!line) return mask;
   const unsigned lit = (uint32_t(levelAt(*line, millis())) * length + UINT16_MAX / 2) / UINT16_MAX;
   mask.active = true;
+  mask.blendScene = line->keepScene;
   switch (line->origin) {
     case LineOrigin::Start:
       mask.stop = lit;
@@ -196,7 +197,9 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
     const uint32_t fullDuration = continuing ? line.fullDuration : uint32_t(fullTime) * 100;
     const uint32_t distance = turnOn ? UINT16_MAX - level : level;
     const uint32_t duration = (fullDuration * distance + UINT16_MAX / 2) / UINT16_MAX;
-    segment.startTransition(0); // finish an ordinary transition on the next frame without resetting the effect
+    // A live color/effect transition continues while a keep-scene curtain fades
+    // out or reverses. A fresh ON may still need its white starting scene.
+    if (!keepScene || (!continuing && turnOn)) segment.startTransition(0);
     // A color-controllable light may still choose white for each fresh ON pass.
     // Reversals never replace the scene, regardless of the requested white option.
     if (!continuing && turnOn && (!keepScene || (root["sauluxLineWhite"] | false))) {

@@ -2,6 +2,12 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**Transitions during live power curtains:** keep-scene mode now renders both
+old and new scenes, preserving native color/effect transitions such as Outside In
+while the independent center power curtain fills, fades out or reverses.
+Power reversals no longer terminate an ongoing native scene transition.
+Use one second as HA `transition:1`, or WLED `tt:10` / `transition:10`.
+
 **White startup with color controls:** use `"sauluxLineKeep":true` together with
 `"sauluxLineWhite":true` to start a fresh ON pass in white and retain brightness.
 Live color/brightness changes remain available. OFF and reversals keep their

@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.12`.
+are not included. Fork releases use versions such as `16.0.1-saulux.13`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -165,6 +165,13 @@ and brightness to the native WLED light. Make power actions conditional on the
 native light's target state, and serialize actions so repeated ON commands never
 toggle OFF. Expose the Template Light to Yandex Smart Home instead of its preset script.
 
+Keep-scene curtains also retain native old/new scene blending while their power
+boundary moves. Color/effect transitions can therefore use **Outside In** (`bs:4`)
+without becoming immediate during a power pass or reversal. Use `transition:1`
+in HA services and `transition:10` / `tt:10` in WLED JSON for one second.
+Preset-local `tt:0` overrides the default and disables the visual transition.
+The power curtain's own center direction and timer remain independent.
+
 **Master power stays on even when every segment is off.** This lets Home Assistant
 control the segment lights independently. Their ON flags report their targets
 immediately while the outgoing pixels finish their curtain. If the master was
@@ -282,11 +289,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.12
-   git push origin saulux-v16.0.1-saulux.12
+   git tag saulux-v16.0.1-saulux.13
+   git push origin saulux-v16.0.1-saulux.13
    ```
 
-The tag suffix (`16.0.1-saulux.12` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.13` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

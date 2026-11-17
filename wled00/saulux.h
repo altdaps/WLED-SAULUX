@@ -9,7 +9,7 @@ bool isSauluxLineTransition(const Segment& segment);
 // One frame uses a contiguous interval, or its complement for the two edge strips.
 struct SauluxLineMask {
   unsigned start = 0, stop = 0;
-  bool outside = false, active = false;
+  bool outside = false, active = false, blendScene = false;
 };
 SauluxLineMask getSauluxLineMask(const Segment& segment, unsigned length);
 void handleSauluxLineTransitions();
