@@ -166,6 +166,7 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
   else if (strncmp(direction, "edges", sizeof("edges")) == 0) origin = LineOrigin::Edges;
   else return false;
   if (root.containsKey("sauluxLineKeep") && !root["sauluxLineKeep"].is<bool>()) return false;
+  if (root.containsKey("sauluxLineWhite") && !root["sauluxLineWhite"].is<bool>()) return false;
   unsigned id = strip.getMainSegmentId();
   if (!readSegmentId(root["seg"], id) || id >= strip.getSegmentsNum() || id >= MAX_NUM_SEGMENTS) return false;
   if (root.containsKey("tt") && !root["tt"].is<int>()) return false;
@@ -196,12 +197,14 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
     const uint32_t distance = turnOn ? UINT16_MAX - level : level;
     const uint32_t duration = (fullDuration * distance + UINT16_MAX / 2) / UINT16_MAX;
     segment.startTransition(0); // finish an ordinary transition on the next frame without resetting the effect
-    if (!continuing && turnOn && !keepScene) {
+    // A color-controllable light may still choose white for each fresh ON pass.
+    // Reversals never replace the scene, regardless of the requested white option.
+    if (!continuing && turnOn && (!keepScene || (root["sauluxLineWhite"] | false))) {
       const auto oldTransition = strip.getTransition();
       strip.setTransition(0);
       segment.setMode(0, false);
       segment.palette = 0;
-      segment.setOpacity(255);
+      if (!keepScene || !segment.opacity) segment.setOpacity(255);
       segment.setColor(0, segment.getLightCapabilities() & 2 ? RGBW32(0, 0, 0, 255) : RGBW32(255, 255, 255, 0));
       segment.setColor(1, 0);
       segment.setColor(2, 0);

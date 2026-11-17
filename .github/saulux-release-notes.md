@@ -2,6 +2,11 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**White startup with color controls:** use `"sauluxLineKeep":true` together with
+`"sauluxLineWhite":true` to start a fresh ON pass in white and retain brightness.
+Live color/brightness changes remain available. OFF and reversals keep their
+current color, so an ongoing pass never jumps back to white.
+
 **Color-preserving curtains:** add `"sauluxLineKeep":true` to resume the existing
 color, effect and segment brightness on ON and accept live color/brightness changes
 while filling. The default white-ON behavior is retained without the flag.

@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.11`.
+are not included. Fork releases use versions such as `16.0.1-saulux.12`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -154,6 +154,12 @@ segment ON target still override it. Without the flag, existing white-ON behavio
 and ordinary control overrides remain unchanged. This preserves color between
 ON/OFF passes; a reboot still applies the configured boot preset.
 
+Add `"sauluxLineWhite":true` alongside `"sauluxLineKeep":true` for a light that
+starts each fresh ON pass in white while retaining live color/brightness controls.
+The selected brightness is retained; OFF and mid-pass reversals keep the current
+color. Only a new ON from fully OFF selects white. RGBW uses its W channel.
+Omitting this option preserves the keep-scene mode introduced in `.11`.
+
 An HA Template Light can route power through this preset while forwarding color
 and brightness to the native WLED light. Make power actions conditional on the
 native light's target state, and serialize actions so repeated ON commands never
@@ -276,11 +282,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.11
-   git push origin saulux-v16.0.1-saulux.11
+   git tag saulux-v16.0.1-saulux.12
+   git push origin saulux-v16.0.1-saulux.12
    ```
 
-The tag suffix (`16.0.1-saulux.11` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.12` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

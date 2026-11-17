@@ -75,9 +75,9 @@ void resetLines(uint32_t now = 0) {
   strip.main = 0; strip.count = 3; strip.duration = 2000; strip.brightness = 128;
   briOld = briT = bri = briLast = 128; transitionActive = jsonTransitionOnce = false; tick = now;
 }
-bool command(unsigned id, const char* endpoint = "start", int time = 20, bool keep = false) {
+bool command(unsigned id, const char* endpoint = "start", int time = 20, bool keep = false, bool white = false) {
   DynamicJsonDocument d(2048); auto root = d.to<JsonObject>();
-  root["sauluxLine"] = endpoint; root["seg"] = id; root["tt"] = time; root["sauluxLineKeep"] = keep;
+  root["sauluxLine"] = endpoint; root["seg"] = id; root["tt"] = time; root["sauluxLineKeep"] = keep; root["sauluxLineWhite"] = white;
   std::string before; serializeJson(root,before);
   const bool result = applySauluxLineToggle(root, 2);
   std::string after; serializeJson(root,after); assert(before == after); // never expand a saved preset
@@ -215,6 +215,37 @@ void checkKeepScene() {
   }
 }
 
+// White-on-start is independent of live color controls. Color changes and
+// reversals retain their scene; only a fresh ON resets it to the white channel.
+void checkWhiteStart() {
+  resetLines(); auto& segment = strip.segments[0];
+  segment.on = false; segment.opacity = 77; segment.colors[0] = 0x0000ff;
+  assert(command(0, "center", 20, true, true));
+  assert(segment.on && segment.colors[0] == 0xff000000 && segment.opacity == 77);
+  tick = 400;
+  DynamicJsonDocument doc(1024); auto root = doc.to<JsonObject>();
+  root["seg"]["id"] = 0; root["seg"]["on"] = true; root["seg"]["col"][0][2] = 255;
+  cancelSauluxLineTransitions(root); assert(isSauluxLineTransition(segment));
+  segment.colors[0] = 0x0000ff; // actual color parsing is exercised on the device
+  const int before = pixels(0);
+  assert(command(0, "center", 20, true, true));
+  assert(!segment.on && pixels(0) == before && segment.colors[0] == 0x0000ff);
+  assert(command(0, "center", 20, true, true));
+  assert(segment.on && pixels(0) == before && segment.colors[0] == 0x0000ff);
+  tick = 2500; handleTransitions();
+  assert(command(0, "center", 20, true, true));
+  assert(!segment.on && segment.colors[0] == 0x0000ff);
+  tick = 4500; handleTransitions();
+  assert(command(0, "center", 20, true, true));
+  assert(segment.on && segment.colors[0] == 0xff000000 && segment.opacity == 77);
+  tick = 6500; handleTransitions(); segment.on = false; segment.caps = 1;
+  assert(command(0, "center", 0, true, true)); assert(segment.colors[0] == 0xffffff);
+  for (const char* invalid : {"1", "0", "\"true\"", "null"}) {
+    const std::string json = std::string("{\"sauluxLine\":\"center\",\"sauluxLineWhite\":") + invalid + "}";
+    assert(!deserializeJson(doc, json)); assert(!applySauluxLineToggle(doc.as<JsonObject>(), 2));
+  }
+}
+
 // Saving a command must leave an HA-readable segment object without applying
 // the toggle or expanding its scene. Exhausted JSON storage must reject the save.
 void checkPresetSelectors() {
@@ -311,7 +342,7 @@ void checkSymmetricReversals(uint32_t now) {
 
 int main() {
   checkConcurrent(0); checkConcurrent(UINT32_MAX - 500);
-  checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave(); checkPresetSelectors(); checkKeepScene();
+  checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave(); checkPresetSelectors(); checkKeepScene(); checkWhiteStart();
   checkGeometries(); checkSymmetricReversals(0); checkSymmetricReversals(UINT32_MAX - 500);
   std::puts("Four line directions, odd/even geometry, continuous reversals, independent segments, palettes and presets passed");
 }
