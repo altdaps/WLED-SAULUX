@@ -2,16 +2,16 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
-Two-ended white light lines can use API presets `{"sauluxLine":"start","tt":20}`
-and `{"sauluxLine":"end","tt":20}`. Each toggles from the current light state,
-with white filling from that endpoint and darkness returning towards it. Assign
-presets to the endpoint buttons; `tt:20` is a 2-second full pass. During a pass,
-either button reverses the existing boundary without moving the illuminated side or
-changing its speed. Repeated presses reverse it again, with no queued action.
-Switching off preserves the running effect and its palette instead of replacing it
-with white. A reversal reveals the same effect without restarting its runtime.
-A new ON pass from fully off still selects white. The visible portion keeps its
-brightness, avoiding a full-line flash or fade.
+Endpoint curtains now work independently per segment. Use
+`{"sauluxLine":"start","seg":0,"tt":20}` and the corresponding `"end"` command;
+change `seg` for another line, or omit it for the main segment. Multiple segments
+can animate and reverse concurrently, preserving their current effects and palettes
+when switching off. A fresh ON pass still selects white.
+
+Master power stays on when individual segments switch off. From master OFF,
+only the requested segment is enabled. Standard segment controls override only
+that segment; master power and brightness controls override all curtains.
+Custom API presets are saved as commands, without runtime expansion.
 
 Button state publishing is available at `<Device Topic>/input/1/state` and subsequent
 one-based input numbers: `1` = pressed, `0` = released. Enable MQTT and **Publish on

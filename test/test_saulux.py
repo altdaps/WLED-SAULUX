@@ -103,6 +103,12 @@ void checkMask(int lineLit, bool lineFromStart) {
   }
 }
 """)
+            state = (ROOT / "wled00/json.cpp").read_text()
+            start = state.index("#ifdef SAULUX", state.index("bool deserializeState("))
+            hook = state[start:state.index("  bool onBefore", start)]
+            (temp / "line_dispatch.cpp").write_text(
+                "bool dispatchLine(JsonObject root, uint8_t callMode) { bool stateResponse = false;\n"
+                + hook + "\n++normalUpdates; return stateResponse; }\n")
             presets = (ROOT / "wled00/presets.cpp").read_text()
             line_guard = presets[presets.index("#ifdef SAULUX\n"):presets.index("  //HTTP API commands")]
             (temp / "line_preset.cpp").write_text(

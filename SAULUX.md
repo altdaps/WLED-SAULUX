@@ -3,7 +3,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.6`.
+are not included. Fork releases use versions such as `16.0.1-saulux.7`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -73,42 +73,49 @@ external REFCLK, actual flash capacity and boot strap levels (including GPIO12)
 on the real boards before use. Local tests and firmware compilation do not establish
 correct electrical operation.
 
-## Two-ended white light line
+## Independent two-ended light lines
 
-A custom API preset can toggle the main segment using an endpoint-aware curtain:
+Create non-overlapping segments in the web interface, then save endpoint commands
+as custom API presets and assign them to the corresponding buttons in Time & Macros:
 
 ```json
-{"sauluxLine":"start","tt":20}
+{"sauluxLine":"start","seg":0,"tt":20}
+{"sauluxLine":"end","seg":0,"tt":20}
+{"sauluxLine":"start","seg":1,"tt":20}
+{"sauluxLine":"end","seg":1,"tt":20}
 ```
 
-Use `"end"` for the opposite endpoint. `start` means the end at the first LED in the
-data chain. `tt` is the full-pass duration in tenths of a second (0–655);
-20 gives a 2-second fill. Save the two commands as separate API presets and assign
-them to the respective buttons in Time & Macros. Assign the same preset to short,
-long and double press for that button to act immediately on the rising edge.
+`seg` is the existing segment ID, starting at zero. The ordinary WLED form
+`"seg":{"id":1}` is also accepted. Omit `seg` to use the current main segment;
+existing one-line presets remain usable, including their old expanded fields.
+Each command addresses one segment. It does not create segments or apply other
+cached scene or master fields that an older firmware added to a preset.
+Saving a custom API preset now keeps its command rather than expanding it at save time.
 
-The command reads the current light state: when off, white fills from the pressed
-endpoint; when on, darkness travels back towards that endpoint. Both buttons share
-the light state, so turning on at one end and off at the other works. The command
-preserves the current effect, palette, colors, speed, intensity, opacity and geometry
-when switching off. Darkness crosses the still-running effect without a white flash.
-Reversing the pass reveals the same effect without restarting its runtime.
-A new ON pass from fully off selects Solid white, using the dedicated W channel on
-RGBW strips (RGB white otherwise), with full segment opacity and no reverse/mirror.
-Existing master brightness and LED boundaries are retained, and a nightlight is cancelled.
-The command controls master power and main segment, and is intended for a single light line. During the curtain,
-either endpoint button reverses the moving boundary from its current position.
-The illuminated side stays at the original endpoint until the pass finishes; changing
-endpoints midway would cause a visual jump. The boundary keeps the same speed, so a
-half-completed fill takes half the full-pass time to return to off. Further presses
-reverse it again without queueing. A held button acts once until released.
-Once fully on or off, the next button selects the endpoint for a new full pass.
-The lit portion keeps its brightness: only the boundary moves, without a global fade.
-Ordinary UI power, brightness, segment or blending-style controls can override the scene.
+`start` is the first LED of that segment, and `end` is the opposite end. `tt` sets
+the full-pass time in tenths of a second (0–655); 20 gives a two-second full pass.
+Assign the same preset to short, long and double press on a button for immediate
+response on its rising edge. A held button acts once until released.
 
-For a line whose first LED is at the left button, assign `start` to the left button
-and `end` to the right. A separate ordinary off preset can initialize the white
-Solid scene and be selected as the boot preset.
+A new ON pass selects Solid white, using the dedicated W channel on RGBW strips
+(RGB white otherwise). An OFF pass keeps the running effect, palette, colors,
+opacity and geometry, while darkness travels back towards the pressed endpoint.
+During a pass, either endpoint reverses its existing boundary without moving the
+illuminated side. Its speed stays constant, and the return time is proportional
+to the distance. Other segments retain their effects and independent timers;
+several segments can fill, fade out or reverse simultaneously.
+
+**Master power stays on even when every segment is off.** This lets Home Assistant
+control the segment lights independently. Their ON flags report their targets
+immediately while the outgoing pixels finish their curtain. If the master was
+off, a line ON command restores master brightness and enables only its segment;
+other segments remain off. An explicit master OFF still turns everything off.
+
+Ordinary segment commands from the UI or Home Assistant override only that
+segment's curtain. Changing master power or brightness overrides all curtains.
+Segment selection and names do not interrupt them. A nightlight is cancelled by
+a line command. Deleted or resized segments cannot retain a stale curtain.
+A separate ordinary OFF preset may still be selected as the boot preset.
 
 ## Button states over MQTT
 
@@ -214,11 +221,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.6
-   git push origin saulux-v16.0.1-saulux.6
+   git tag saulux-v16.0.1-saulux.7
+   git push origin saulux-v16.0.1-saulux.7
    ```
 
-The tag suffix (`16.0.1-saulux.6` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.7` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
