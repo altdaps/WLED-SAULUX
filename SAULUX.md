@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.9`.
+are not included. Fork releases use versions such as `16.0.1-saulux.10`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -91,24 +91,28 @@ Create non-overlapping segments in the web interface, then save endpoint command
 as custom API presets and assign them to the corresponding buttons in Time & Macros:
 
 ```json
-{"sauluxLine":"start","seg":0,"tt":20}
-{"sauluxLine":"end","seg":0,"tt":20}
-{"sauluxLine":"start","seg":1,"tt":20}
-{"sauluxLine":"end","seg":1,"tt":20}
+{"sauluxLine":"start","seg":{"id":0},"tt":20}
+{"sauluxLine":"end","seg":{"id":0},"tt":20}
+{"sauluxLine":"start","seg":{"id":1},"tt":20}
+{"sauluxLine":"end","seg":{"id":1},"tt":20}
 ```
 
-`seg` is the existing segment ID, starting at zero. The ordinary WLED form
-`"seg":{"id":1}` is also accepted. Omit `seg` to use the current main segment;
+`seg.id` is the existing segment ID, starting at zero. Live API commands also
+accept the numeric shorthand `"seg":1`. Omit `seg` to use the current main segment;
 existing one-line presets remain usable, including their old expanded fields.
 Each command addresses one segment. It does not create segments or apply other
 cached scene or master fields that an older firmware added to a preset.
-Saving a custom API preset now keeps its command rather than expanding it at save time.
+Saving a custom API preset keeps its command rather than expanding its scene.
+Starting with `.10`, numeric segment selectors are saved as `{"id":N}` so
+Home Assistant's WLED client can parse and list them. Existing numeric presets
+need to be resaved; an omitted selector still uses the main segment dynamically.
+See [python-wled's preset model](https://github.com/frenck/python-wled/blob/v1.1.1/src/wled/models.py).
 
 The following additional API presets select symmetric passes:
 
 ```json
-{"sauluxLine":"center","seg":0,"tt":20}
-{"sauluxLine":"edges","seg":0,"tt":20}
+{"sauluxLine":"center","seg":{"id":0},"tt":20}
+{"sauluxLine":"edges","seg":{"id":0},"tt":20}
 ```
 
 | Direction | New ON pass | OFF pass |
@@ -252,11 +256,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.9
-   git push origin saulux-v16.0.1-saulux.9
+   git tag saulux-v16.0.1-saulux.10
+   git push origin saulux-v16.0.1-saulux.10
    ```
 
-The tag suffix (`16.0.1-saulux.9` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.10` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

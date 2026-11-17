@@ -381,7 +381,17 @@ bool deserializeState(JsonObject root, byte callMode, byte presetId)
   if (root.containsKey("sauluxLine")) {
     if (root.containsKey("psave")) {
       const int preset = root["psave"] | 0;
-      if (preset > 0 && preset < 251 && root["o"].set(true)) savePreset(preset, nullptr, root);
+      if (preset > 0 && preset < 251 && root["o"].set(true)) {
+        // HA's WLED client decodes preset segments as objects, not numeric IDs.
+        // Keep the shorthand for live commands but persist a compatible selector.
+        // Source: https://github.com/frenck/python-wled/blob/v1.1.1/src/wled/models.py
+        if (root["seg"].is<int>()) {
+          const int segmentId = root["seg"].as<int>();
+          root.remove("seg");
+          if (!root.createNestedObject("seg")["id"].set(segmentId)) return stateResponse;
+        }
+        savePreset(preset, nullptr, root);
+      }
     } else {
       applySauluxLineToggle(root, callMode);
     }

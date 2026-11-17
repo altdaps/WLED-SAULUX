@@ -2,18 +2,24 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**Home Assistant preset compatibility:** saved `sauluxLine` commands now convert
+numeric `seg` selectors to the standard object form, such as `"seg":{"id":0}`.
+The live API still accepts `"seg":0`. Resave older numeric presets to make them
+appear in HA's Preset selector. Saving does not execute the command or expand
+its scene, and an omitted selector remains dynamic.
+
 **Time zone** now includes **Moscow (UTC+3)** and **Saratov (UTC+4)**, both without daylight saving time. Choose the city in **Config → Time & Macros**; set the additional **UTC offset** to **0** if you previously entered the city's offset manually. Upgrading preserves the existing time settings.
 
 Two additional directional line presets are available:
-`{"sauluxLine":"center","seg":0,"tt":20}` fills from the center to both edges;
-`{"sauluxLine":"edges","seg":0,"tt":20}` fills from both edges to the center.
+`{"sauluxLine":"center","seg":{"id":0},"tt":20}` fills from the center to both edges;
+`{"sauluxLine":"edges","seg":{"id":0},"tt":20}` fills from both edges to the center.
 Calling either again switches off in reverse. During a pass, any line direction
 reverses its current shape continuously, retaining its speed and running palette.
 The center is calculated independently for each segment. Existing `start` / `end`
 presets and button assignments are unchanged.
 
 Directional curtains work independently per segment. Use
-`{"sauluxLine":"start","seg":0,"tt":20}` and the corresponding `"end"` command;
+`{"sauluxLine":"start","seg":{"id":0},"tt":20}` and the corresponding `"end"` command;
 change `seg` for another line, or omit it for the main segment. Multiple segments
 can animate and reverse concurrently, preserving their current effects and palettes
 when switching off. A fresh ON pass still selects white.

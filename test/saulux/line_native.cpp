@@ -58,7 +58,11 @@ void applyFinalBri();
 #include "line_transitions.cpp"
 #include "line_mask.cpp"
 inline unsigned acceptedPresetUpdates = 0, genericPresetUpdates = 0, releasedLocks = 0, savedPresets = 0, normalUpdates = 0;
-void savePreset(uint8_t, const char*, JsonObject) { ++savedPresets; }
+inline std::string savedPresetJson;
+void savePreset(uint8_t, const char*, JsonObject preset) {
+  ++savedPresets;
+  savedPresetJson.clear(); serializeJson(preset, savedPresetJson);
+}
 #include "line_dispatch.cpp"
 void deserializeState(JsonObject root, uint8_t mode, uint8_t) { dispatchLine(root, mode); }
 void releaseJSONBufferLock() { ++releasedLocks; }
@@ -166,6 +170,36 @@ void checkValidationAndSave() {
   root.clear(); root["sauluxLine"] = "start"; assert(applySauluxLineToggle(root,2));
   assert(isSauluxLineTransition(strip.segments[2]) && !isSauluxLineTransition(strip.segments[0]));
 }
+// Saving a command must leave an HA-readable segment object without applying
+// the toggle or expanding its scene. Exhausted JSON storage must reject the save.
+void checkPresetSelectors() {
+  resetLines();
+  for (const char* origin : {"start", "end", "center", "edges"}) {
+    for (unsigned id : {0U, 1U, 2U}) {
+      DynamicJsonDocument doc(1024); auto root = doc.to<JsonObject>();
+      root["sauluxLine"] = origin; root["seg"] = id; root["tt"] = 10; root["psave"] = 9;
+      const unsigned before = savedPresets;
+      dispatchLine(root, 2);
+      assert(savedPresets == before + 1);
+      DynamicJsonDocument saved(1024); assert(!deserializeJson(saved, savedPresetJson));
+      assert(saved["seg"].is<JsonObject>() && saved["seg"]["id"].as<unsigned>() == id);
+      assert(saved["sauluxLine"].as<std::string>() == origin && saved["tt"] == 10);
+      assert(!saved.containsKey("on") && !saved.containsKey("bs") && !saved.containsKey("nl"));
+      assert(strip.segments[id].on && !isSauluxLineTransition(strip.segments[id]));
+    }
+  }
+  DynamicJsonDocument doc(1024); auto root = doc.to<JsonObject>();
+  root["sauluxLine"] = "edges"; root["psave"] = 9;
+  dispatchLine(root, 2); assert(!root.containsKey("seg")); // main segment remains dynamic
+  root["seg"]["id"] = 1; root["seg"]["on"] = false;
+  dispatchLine(root, 2); assert(root["seg"]["id"] == 1 && root["seg"]["on"] == false);
+  DynamicJsonDocument full(JSON_OBJECT_SIZE(4)); auto limited = full.to<JsonObject>();
+  limited["sauluxLine"] = "edges"; limited["seg"] = 0; limited["psave"] = 9; limited["o"] = true;
+  const unsigned before = savedPresets;
+  dispatchLine(limited, 2);
+  assert(savedPresets == before && !isSauluxLineTransition(strip.segments[0]));
+}
+
 // Sort by geometric distance instead of reproducing the firmware's interval
 // formulas. Verify every intermediate visible count, including asymmetric ties.
 void checkGeometries() {
@@ -232,7 +266,7 @@ void checkSymmetricReversals(uint32_t now) {
 
 int main() {
   checkConcurrent(0); checkConcurrent(UINT32_MAX - 500);
-  checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave();
+  checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave(); checkPresetSelectors();
   checkGeometries(); checkSymmetricReversals(0); checkSymmetricReversals(UINT32_MAX - 500);
   std::puts("Four line directions, odd/even geometry, continuous reversals, independent segments, palettes and presets passed");
 }

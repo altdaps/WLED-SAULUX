@@ -1,7 +1,7 @@
 # SAULUX — руководство по установке, настройке и управлению
 
 Руководство для форка [altdaps/WLED-SAULUX](https://github.com/altdaps/WLED-SAULUX).
-Описанное поведение соответствует **16.0.1-saulux.9**, включая независимые переходы нескольких сегментов.
+Описанное поведение соответствует **16.0.1-saulux.10**, включая независимые переходы нескольких сегментов.
 
 Прошивка основана на официальной **WLED 16.0.1**, использует **ESP-IDF 4.4 / Arduino 2**
 и предназначена для **ESP32-WROOM-32 без PSRAM**, с физической flash-памятью **4 или 8 МБ**.
@@ -126,13 +126,13 @@
 <a name="firmware-files"></a>
 ## 3. Выбор файла прошивки и объёма flash
 
-Пример имён файлов для версии `16.0.1-saulux.9`:
+Пример имён файлов для версии `16.0.1-saulux.10`:
 
 | Модель | Для OTA | Для первой установки через USB / UART |
 | --- | --- | --- |
-| 2I2O | `WLED_16.0.1-saulux.9_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.9_SAULUX_2I2O_factory.bin` |
-| 5I4O | `WLED_16.0.1-saulux.9_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.9_SAULUX_5I4O_factory.bin` |
-| ETHERNET | `WLED_16.0.1-saulux.9_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.9_SAULUX_ETHERNET_factory.bin` |
+| 2I2O | `WLED_16.0.1-saulux.10_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.10_SAULUX_2I2O_factory.bin` |
+| 5I4O | `WLED_16.0.1-saulux.10_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.10_SAULUX_5I4O_factory.bin` |
+| ETHERNET | `WLED_16.0.1-saulux.10_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.10_SAULUX_ETHERNET_factory.bin` |
 
 В релизе находятся **три варианта прошивки**, каждый в обычном и factory-исполнении,
 а также `SHA256SUMS` и `manifest.json`.
@@ -173,7 +173,7 @@
 Пример для SAULUX ETHERNET и современного `esptool`:
 
 ```sh
-python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.9_SAULUX_ETHERNET_factory.bin
+python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.10_SAULUX_ETHERNET_factory.bin
 ```
 
 Замените порт и имя файла. В Linux порт может иметь вид `/dev/ttyUSB0`, в Windows — `COM4`.
@@ -413,13 +413,13 @@ Reverse / Mirror отключаются для новой белой сцены.
 Пресет 11, начало сегмента 0:
 
 ```json
-{"sauluxLine":"start","seg":0,"tt":20}
+{"sauluxLine":"start","seg":{"id":0},"tt":20}
 ```
 
 Пресет 12, конец сегмента 0:
 
 ```json
-{"sauluxLine":"end","seg":0,"tt":20}
+{"sauluxLine":"end","seg":{"id":0},"tt":20}
 ```
 
 Затем откройте **Config → Time & Macros** и назначьте действия:
@@ -444,11 +444,11 @@ Reverse / Mirror отключаются для новой белой сцены.
 Создайте ещё два пользовательских API-пресета с любыми свободными ID:
 
 ```json
-{"sauluxLine":"center","seg":0,"tt":20}
+{"sauluxLine":"center","seg":{"id":0},"tt":20}
 ```
 
 ```json
-{"sauluxLine":"edges","seg":0,"tt":20}
+{"sauluxLine":"edges","seg":{"id":0},"tt":20}
 ```
 
 Первый включает сегмент от центра к краям, второй — от краёв к центру.
@@ -480,7 +480,13 @@ Reverse / Mirror отключаются для новой белой сцены.
 Старые развёрнутые пресеты тоже принимаются: ID берётся из `seg`, а добавленные старой версией
 поля сцены и общего питания не используются для выполнения `sauluxLine`.
 
-Допустима и объектная запись сегмента:
+Для пресетов используйте объектную запись сегмента. Начиная с **16.0.1-saulux.10**,
+при сохранении команды числовая короткая форма `"seg":1` автоматически превращается
+в `"seg":{"id":1}`. Это нужно для Home Assistant: его клиент WLED разбирает `seg`
+как описание сегмента и пропускает пресет с простым числом.
+Прямые команды API продолжают принимать обе формы; остальные поля команды при сохранении не разворачиваются.
+
+Рекомендуемая запись:
 
 ```json
 {"sauluxLine":"end","seg":{"id":1},"tt":20}
@@ -516,13 +522,13 @@ Reverse / Mirror отключаются для новой белой сцены.
 Пресет 21, начало сегмента 1:
 
 ```json
-{"sauluxLine":"start","seg":1,"tt":20}
+{"sauluxLine":"start","seg":{"id":1},"tt":20}
 ```
 
 Пресет 22, конец сегмента 1:
 
 ```json
-{"sauluxLine":"end","seg":1,"tt":20}
+{"sauluxLine":"end","seg":{"id":1},"tt":20}
 ```
 
 Пример назначения четырёх кнопок на **SAULUX 5I4O**:
@@ -580,7 +586,7 @@ curl --fail --silent --show-error http://192.168.1.50/json/info
 ```sh
 curl --fail --silent --show-error \
   -H 'Content-Type: application/json' \
-  -d '{"sauluxLine":"end","seg":1,"tt":20}' \
+  -d '{"sauluxLine":"end","seg":{"id":1},"tt":20}' \
   http://192.168.1.50/json/state
 ```
 
@@ -626,6 +632,18 @@ curl --fail --silent --show-error \
 цвет и эффект; палитра выбирается отдельной сущностью. Master управляет общим питанием и яркостью.
 Для независимых линий используйте их сущности, а не общее выключение Master.
 [Документация интеграции WLED](https://www.home-assistant.io/integrations/wled/).
+
+### Пресет отсутствует в списке HA
+
+Проверьте его запись в `http://<IP>/presets.json`. Для команды линии указывайте
+`"seg":{"id":0}`, а не `"seg":0`. Числовой селектор допустим для прямого API,
+но клиент HA не может разобрать его как сегмент и пропускает такой пресет.
+Начиная с `.10` прошивка сама исправляет форму при сохранении; ранее сохранённые
+числовые записи нужно пересохранить. Имена, ID и длительности оставьте своими.
+После исправления обновите сущность Preset или перезагрузите интеграцию WLED.
+Пресеты находятся в сущности **Preset / Предустановка**.
+
+Источник: [модель пресетов python-wled 1.1.1](https://github.com/frenck/python-wled/blob/v1.1.1/src/wled/models.py).
 
 ### Основной светильник недоступен, а сегмент работает
 
@@ -871,9 +889,9 @@ pio run -e saulux_ethernet
 затем подготовьте версию пакета и соберите интерфейс до прошивки:
 
 ```sh
-git checkout saulux-v16.0.1-saulux.9
+git checkout saulux-v16.0.1-saulux.10
 npm ci
-python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.9
+python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.10
 npm run build
 pio run
 ```
@@ -895,23 +913,23 @@ pio run -e esp32dev
 
 ### Выпуск через GitHub Actions
 
-Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.9`.
+Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.10`.
 Тег должен соответствовать базовой версии исходников; новую версию выпускают новым тегом.
 
 Порядок выпуска следующей версии:
 
 1. Сохраните и отправьте изменения в свой репозиторий.
-2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.10`, и отправьте его.
+2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.11`, и отправьте его.
 3. Дождитесь успешного workflow **SAULUX Release**.
 4. Проверьте три OTA-файла, три factory-файла и `SHA256SUMS` в Releases.
 5. Дождитесь успешного развёртывания Pages и проверьте `manifest.json`.
 
-Пример команд для будущей версии `.10`, если её тег ещё не существует:
+Пример команд для будущей версии `.11`, если её тег ещё не существует:
 
 ```sh
 git push origin main
-git tag saulux-v16.0.1-saulux.10
-git push origin saulux-v16.0.1-saulux.10
+git tag saulux-v16.0.1-saulux.11
+git push origin saulux-v16.0.1-saulux.11
 ```
 
 Если запуск по тегу не произошёл, используйте **Actions → SAULUX Release → Run workflow**
