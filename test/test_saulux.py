@@ -145,9 +145,9 @@ class ProfileTests(unittest.TestCase):
             render = (ROOT / "wled00/FX_fcn.cpp").read_text()
             mask = render[render.index("    const auto compositePixel ="):render.index("    const auto setMirroredPixel =", render.index("    const auto compositePixel ="))]
             (temp / "line_mask.cpp").write_text("""
-void checkMask(int lineLit, bool lineFromStart) {
+void checkMask(int length, const SauluxLineMask& lineMask, const std::vector<bool>& visible) {
   Segment topSegment; topSegment.start = 7;
-  const int length = 105, cct = 127;
+  const int cct = 127;
   uint32_t _pixels[120] = {}; uint8_t* _pixelCCT = nullptr;
   const auto color_blend = [](uint32_t, uint32_t b, uint8_t) { return b; };
   const auto segblend = [](uint32_t a, uint32_t) { return a; };
@@ -155,8 +155,7 @@ void checkMask(int lineLit, bool lineFromStart) {
   for (int i = 0; i < length; i++) {
     const uint32_t original = 0x00002000U + i; // colored pattern, never white
     compositePixel(topSegment.start + i, original, 255);
-    const bool visible = lineLit < 0 || (lineFromStart ? i < lineLit : i >= length - lineLit);
-    assert(_pixels[topSegment.start + i] == (visible ? original : 0));
+    assert(_pixels[topSegment.start + i] == (visible[i] ? original : 0));
   }
 }
 """)

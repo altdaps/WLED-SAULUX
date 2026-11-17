@@ -2,6 +2,8 @@
 #include "native_shim.h"
 #include <cassert>
 #include <array>
+#include <algorithm>
+#include <numeric>
 using byte = uint8_t;
 #define MAX_NUM_SEGMENTS 4
 inline constexpr uint32_t BLACK = 0;
@@ -76,7 +78,10 @@ bool command(unsigned id, const char* endpoint = "start", int time = 20) {
   std::string after; serializeJson(root,after); assert(before == after); // never expand a saved preset
   return result;
 }
-int pixels(unsigned id) { return getSauluxLineLitPixels(strip.segments[id], 35); }
+int pixels(unsigned id) {
+  const auto mask = getSauluxLineMask(strip.segments[id], 35);
+  return mask.active ? int(mask.outside ? 35 - (mask.stop - mask.start) : mask.stop - mask.start) : -1;
+}
 void checkConcurrent(uint32_t now) {
   resetLines(now);
   auto& first = strip.segments[0]; auto& second = strip.segments[1]; auto& third = strip.segments[2];
@@ -84,14 +89,14 @@ void checkConcurrent(uint32_t now) {
   assert(command(0, "end", 20));
   assert(command(1, "start", 15));
   assert(first.on && !second.on && third.on);
-  assert(!isSauluxLineFromStart(first) && isSauluxLineFromStart(second));
+  assert(getSauluxLineMask(first, 35).start == 35 && getSauluxLineMask(second, 35).stop == 35);
   assert(bri == 128 && !transitionActive && strip.duration == 2000);
   tick = now + 400;
   assert(pixels(0) == 7 && pixels(1) == 26);
   const int before = pixels(0);
   assert(command(0, "start", 50)); // reverse keeps its original speed, not the other preset's duration
   assert(pixels(0) == before && !first.on);
-  assert(!isSauluxLineFromStart(first));
+  assert(getSauluxLineMask(first, 35).start == 35 - before);
   tick = now + 900; handleTransitions();
   assert(pixels(0) == -1 && !first.on && isSauluxLineTransition(second));
   assert(command(0, "start", 30));
@@ -143,7 +148,7 @@ void checkMasterAndGenericTimer() {
 }
 void checkValidationAndSave() {
   resetLines(); strip.segments[0].on = false; assert(command(0)); tick = 200; const int before = pixels(0);
-  for (const char* endpoint : {"", "left", "startx", "endx", "START"}) assert(!command(1, endpoint));
+  for (const char* endpoint : {"", "left", "startx", "endx", "centerx", "edgesx", "START", "CENTER", "EDGES"}) assert(!command(1, endpoint));
   for (int duration : {-1, 656, 2147483647}) assert(!command(1, "start", duration));
   for (const char* value : {"-1", "3", "4", "true", "1.5", "\"1\"", "[]"}) {
     DynamicJsonDocument d(512); std::string json = std::string("{\"sauluxLine\":\"start\",\"seg\":") + value + "}";
@@ -160,11 +165,74 @@ void checkValidationAndSave() {
   root.clear(); root["sauluxLine"] = "start"; assert(applySauluxLineToggle(root,2));
   assert(isSauluxLineTransition(strip.segments[2]) && !isSauluxLineTransition(strip.segments[0]));
 }
+// Sort by geometric distance instead of reproducing the firmware's interval
+// formulas. Verify every intermediate visible count, including asymmetric ties.
+void checkGeometries() {
+  for (int length : {1, 2, 3, 8, 9, 34, 35, 104, 105}) {
+    for (const char* origin : {"start", "end", "center", "edges"}) {
+      resetLines(); auto& segment = strip.segments[0];
+      segment.stop = length; segment.on = false;
+      assert(command(0, origin, 655));
+      std::vector<int> order(length);
+      std::iota(order.begin(), order.end(), 0);
+      if (!strcmp(origin, "center") || !strcmp(origin, "edges")) {
+        std::stable_sort(order.begin(), order.end(), [length](int a, int b) {
+          return abs(2 * a - (length - 1)) < abs(2 * b - (length - 1));
+        });
+      }
+      if (!strcmp(origin, "end") || !strcmp(origin, "edges")) std::reverse(order.begin(), order.end());
+      for (int lit = 0; lit <= length; lit++) {
+        tick = (uint32_t(lit) * 65500 + length / 2) / length;
+        const auto mask = getSauluxLineMask(segment, length);
+        assert(mask.active && mask.start <= mask.stop && mask.stop <= unsigned(length));
+        assert(int(mask.outside ? length - (mask.stop - mask.start) : mask.stop - mask.start) == lit);
+        std::vector<bool> visible(length, false);
+        for (int i = 0; i < lit; i++) visible[order[i]] = true;
+        checkMask(length, mask, visible);
+      }
+      tick = 65500; handleTransitions();
+      const auto done = getSauluxLineMask(segment, length);
+      assert(segment.on && !done.active);
+      checkMask(length, done, std::vector<bool>(length, true));
+    }
+  }
+}
+
+// A different direction while moving reverses the same shape without changing
+// the scene, speed, master power or another segment's timer, even at millis wrap.
+void checkSymmetricReversals(uint32_t now) {
+  for (const char* origin : {"start", "end", "center", "edges"}) {
+    resetLines(now); auto& segment = strip.segments[0];
+    segment.mode = 65; segment.palette = 11; segment.opacity = 197;
+    segment.reverse = segment.mirror = true; segment.runtime = 999;
+    segment.colors[0] = 0x2468ac;
+    assert(command(0, origin));
+    tick = now + 600;
+    strip.segments[1].on = false;
+    assert(command(1, "edges", 30));
+    const auto before = getSauluxLineMask(segment, 35);
+    assert(before.active && !segment.on);
+    for (const char* reversal : {"start", "end", "center", "edges", "center"}) {
+      assert(command(0, reversal, 60));
+      const auto after = getSauluxLineMask(segment, 35);
+      assert(after.start == before.start && after.stop == before.stop && after.outside == before.outside);
+      assert(segment.mode == 65 && segment.palette == 11 && segment.opacity == 197 && segment.runtime == 999);
+      assert(segment.reverse && segment.mirror && segment.colors[0] == 0x2468ac);
+    }
+    assert(segment.on && isSauluxLineTransition(strip.segments[1]));
+    tick = now + 1201; handleTransitions();
+    assert(segment.on && !isSauluxLineTransition(segment));
+    assert(isSauluxLineTransition(strip.segments[1]) && pixels(1) == 7);
+    assert(command(0, "center", 0)); assert(!segment.on && !isSauluxLineTransition(segment));
+    assert(command(0, "edges", 0)); assert(segment.on && !isSauluxLineTransition(segment));
+    assert(segment.mode == 0 && segment.palette == 0 && segment.colors[0] == 0xff000000);
+  }
+}
+
 int main() {
   checkConcurrent(0); checkConcurrent(UINT32_MAX - 500);
   checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave();
-  for (bool anchor : {false, true}) for (int lit : {0, 1, 52, 104, 105}) checkMask(lit, anchor);
-  checkMask(-1, true);
-  std::puts("Independent segments, scoped controls, palette/runtime continuity, master isolation and preset saving passed");
+  checkGeometries(); checkSymmetricReversals(0); checkSymmetricReversals(UINT32_MAX - 500);
+  std::puts("Four line directions, odd/even geometry, continuous reversals, independent segments, palettes and presets passed");
 }
 // AI: end

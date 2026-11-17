@@ -6,8 +6,12 @@ class Segment;
 bool prepareSauluxConfig(JsonObject root);
 bool applySauluxLineToggle(JsonObject root, uint8_t callMode);
 bool isSauluxLineTransition(const Segment& segment);
-int getSauluxLineLitPixels(const Segment& segment, unsigned length);
-bool isSauluxLineFromStart(const Segment& segment);
+// One frame uses a contiguous interval, or its complement for the two edge strips.
+struct SauluxLineMask {
+  unsigned start = 0, stop = 0;
+  bool outside = false, active = false;
+};
+SauluxLineMask getSauluxLineMask(const Segment& segment, unsigned length);
 void handleSauluxLineTransitions();
 void cancelSauluxLineTransitions(JsonObject root);
 bool makeSauluxHostname(char* buffer, size_t capacity);

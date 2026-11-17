@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.8`.
+are not included. Fork releases use versions such as `16.0.1-saulux.9`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -85,7 +85,7 @@ Existing timezone selections and manual offsets are preserved on upgrade.
 
 The fixed offsets follow [IANA Europe/Moscow and Europe/Saratov](https://data.iana.org/time-zones/tzdb/europe).
 
-## Independent two-ended light lines
+## Independent directional light lines
 
 Create non-overlapping segments in the web interface, then save endpoint commands
 as custom API presets and assign them to the corresponding buttons in Time & Macros:
@@ -104,6 +104,24 @@ Each command addresses one segment. It does not create segments or apply other
 cached scene or master fields that an older firmware added to a preset.
 Saving a custom API preset now keeps its command rather than expanding it at save time.
 
+The following additional API presets select symmetric passes:
+
+```json
+{"sauluxLine":"center","seg":0,"tt":20}
+{"sauluxLine":"edges","seg":0,"tt":20}
+```
+
+| Direction | New ON pass | OFF pass |
+| --- | --- | --- |
+| `start` | First LED to last LED | Last LED to first LED |
+| `end` | Last LED to first LED | First LED to last LED |
+| `center` | Center to both edges | Both edges to center |
+| `edges` | Both edges to center | Center to both edges |
+
+The center is local to the addressed segment. Odd visible/dark counts may give
+one side one extra LED. These are `sauluxLine` preset commands, not cycling
+entries in the Effects list. Assign any direction to a button or call it via API.
+
 `start` is the first LED of that segment, and `end` is the opposite end. `tt` sets
 the full-pass time in tenths of a second (0–655); 20 gives a two-second full pass.
 Assign the same preset to short, long and double press on a button for immediate
@@ -111,9 +129,10 @@ response on its rising edge. A held button acts once until released.
 
 A new ON pass selects Solid white, using the dedicated W channel on RGBW strips
 (RGB white otherwise). An OFF pass keeps the running effect, palette, colors,
-opacity and geometry, while darkness travels back towards the pressed endpoint.
-During a pass, either endpoint reverses its existing boundary without moving the
-illuminated side. Its speed stays constant, and the return time is proportional
+opacity and geometry, while the visible region shrinks in the reverse of its ON direction.
+During a pass, any direction reverses the existing boundary or boundaries without
+moving the illuminated area. The current shape remains until the pass finishes;
+a later command then chooses a fresh direction. Its speed stays constant, and the return time is proportional
 to the distance. Other segments retain their effects and independent timers;
 several segments can fill, fade out or reverse simultaneously.
 
@@ -233,11 +252,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.8
-   git push origin saulux-v16.0.1-saulux.8
+   git tag saulux-v16.0.1-saulux.9
+   git push origin saulux-v16.0.1-saulux.9
    ```
 
-The tag suffix (`16.0.1-saulux.8` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.9` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
