@@ -75,9 +75,9 @@ void resetLines(uint32_t now = 0) {
   strip.main = 0; strip.count = 3; strip.duration = 2000; strip.brightness = 128;
   briOld = briT = bri = briLast = 128; transitionActive = jsonTransitionOnce = false; tick = now;
 }
-bool command(unsigned id, const char* endpoint = "start", int time = 20) {
+bool command(unsigned id, const char* endpoint = "start", int time = 20, bool keep = false) {
   DynamicJsonDocument d(2048); auto root = d.to<JsonObject>();
-  root["sauluxLine"] = endpoint; root["seg"] = id; root["tt"] = time;
+  root["sauluxLine"] = endpoint; root["seg"] = id; root["tt"] = time; root["sauluxLineKeep"] = keep;
   std::string before; serializeJson(root,before);
   const bool result = applySauluxLineToggle(root, 2);
   std::string after; serializeJson(root,after); assert(before == after); // never expand a saved preset
@@ -170,6 +170,51 @@ void checkValidationAndSave() {
   root.clear(); root["sauluxLine"] = "start"; assert(applySauluxLineToggle(root,2));
   assert(isSauluxLineTransition(strip.segments[2]) && !isSauluxLineTransition(strip.segments[0]));
 }
+// Keep-scene mode resumes the chosen colors/opacity and allows HA's ordinary
+// color and brightness controls to update an active pass without removing it.
+void checkKeepScene() {
+  resetLines(); auto& segment = strip.segments[0];
+  segment.on = false; segment.mode = 65; segment.palette = 11;
+  segment.colors[0] = 0x123456; segment.opacity = 77; segment.runtime = 999;
+  segment.reverse = segment.mirror = true;
+  assert(command(0, "center", 20, true));
+  assert(segment.on && segment.colors[0] == 0x123456 && segment.opacity == 77);
+  assert(segment.mode == 65 && segment.palette == 11 && segment.runtime == 999);
+  assert(segment.reverse && segment.mirror);
+  tick = 400; const int before = pixels(0);
+  strip.segments[1].on = false; assert(command(1));
+  DynamicJsonDocument doc(2048); auto root = doc.to<JsonObject>();
+  root["on"] = true; root["bri"] = 64;
+  root["seg"]["id"] = 0; root["seg"]["on"] = true; root["seg"]["bri"] = 42;
+  root["seg"]["col"][0][0] = 255; root["seg"]["fx"] = 0; root["seg"]["frz"] = false;
+  cancelSauluxLineTransitions(root);
+  assert(isSauluxLineTransition(segment) && pixels(0) == before);
+  assert(!isSauluxLineTransition(strip.segments[1])); // default mode still yields to master brightness
+  assert(command(0, "edges")); // reversal retains keep mode, shape and original scene
+  assert(!segment.on && pixels(0) == before);
+  root.clear(); root["seg"]["id"] = 0; root["seg"]["col"][0][2] = 255;
+  cancelSauluxLineTransitions(root); assert(isSauluxLineTransition(segment));
+  tick = 1000; handleTransitions(); assert(!isSauluxLineTransition(segment));
+  assert(command(0, "center", 20, true));
+  assert(segment.on && segment.colors[0] == 0x123456 && segment.opacity == 77);
+  root.clear(); root["seg"]["id"] = 0; root["seg"]["on"] = false;
+  cancelSauluxLineTransitions(root); assert(!isSauluxLineTransition(segment));
+  assert(command(0, "center", 20, true));
+  root.clear(); root["seg"]["id"] = 0; root["seg"]["of"] = 3;
+  cancelSauluxLineTransitions(root); assert(!isSauluxLineTransition(segment));
+  assert(command(0, "center", 20, true));
+  root.clear(); root["on"] = false;
+  cancelSauluxLineTransitions(root); assert(!isSauluxLineTransition(segment));
+  segment.on = false; segment.opacity = 0;
+  assert(command(0, "center", 0, true));
+  assert(segment.on && segment.opacity == 255 && segment.colors[0] == 0x123456);
+  for (const char* invalid : {"1", "0", "\"true\"", "null"}) {
+    root.clear();
+    const std::string json = std::string("{\"sauluxLine\":\"center\",\"sauluxLineKeep\":") + invalid + "}";
+    assert(!deserializeJson(doc, json)); assert(!applySauluxLineToggle(doc.as<JsonObject>(), 2));
+  }
+}
+
 // Saving a command must leave an HA-readable segment object without applying
 // the toggle or expanding its scene. Exhausted JSON storage must reject the save.
 void checkPresetSelectors() {
@@ -266,7 +311,7 @@ void checkSymmetricReversals(uint32_t now) {
 
 int main() {
   checkConcurrent(0); checkConcurrent(UINT32_MAX - 500);
-  checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave(); checkPresetSelectors();
+  checkScenesAndControls(); checkMasterAndGenericTimer(); checkValidationAndSave(); checkPresetSelectors(); checkKeepScene();
   checkGeometries(); checkSymmetricReversals(0); checkSymmetricReversals(UINT32_MAX - 500);
   std::puts("Four line directions, odd/even geometry, continuous reversals, independent segments, palettes and presets passed");
 }

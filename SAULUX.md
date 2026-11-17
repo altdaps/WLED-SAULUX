@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.10`.
+are not included. Fork releases use versions such as `16.0.1-saulux.11`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -140,6 +140,25 @@ a later command then chooses a fresh direction. Its speed stays constant, and th
 to the distance. Other segments retain their effects and independent timers;
 several segments can fill, fade out or reverse simultaneously.
 
+For a color light controlled through Home Assistant, opt into scene preservation:
+
+```json
+{"sauluxLine":"center","seg":{"id":0},"tt":10,"sauluxLineKeep":true}
+```
+
+This preserves the current colors, effect, palette, geometry and segment brightness
+on a new ON pass. A zero-opacity scene resumes at 255. Color and brightness updates
+may change the running scene without interrupting its curtain. Reversals retain the
+active pass's keep setting. Master OFF, geometry changes and a contrary explicit
+segment ON target still override it. Without the flag, existing white-ON behavior
+and ordinary control overrides remain unchanged. This preserves color between
+ON/OFF passes; a reboot still applies the configured boot preset.
+
+An HA Template Light can route power through this preset while forwarding color
+and brightness to the native WLED light. Make power actions conditional on the
+native light's target state, and serialize actions so repeated ON commands never
+toggle OFF. Expose the Template Light to Yandex Smart Home instead of its preset script.
+
 **Master power stays on even when every segment is off.** This lets Home Assistant
 control the segment lights independently. Their ON flags report their targets
 immediately while the outgoing pixels finish their curtain. If the master was
@@ -147,7 +166,8 @@ off, a line ON command restores master brightness and enables only its segment;
 other segments remain off. An explicit master OFF still turns everything off.
 
 Ordinary segment commands from the UI or Home Assistant override only that
-segment's curtain. Changing master power or brightness overrides all curtains.
+segment's curtain. Master power changes override all curtains. Master brightness
+changes override passes without `sauluxLineKeep`; keep-scene passes retain their boundaries.
 Segment selection and names do not interrupt them. A nightlight is cancelled by
 a line command. Deleted or resized segments cannot retain a stale curtain.
 A separate ordinary OFF preset may still be selected as the boot preset.
@@ -256,11 +276,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.10
-   git push origin saulux-v16.0.1-saulux.10
+   git tag saulux-v16.0.1-saulux.11
+   git push origin saulux-v16.0.1-saulux.11
    ```
 
-The tag suffix (`16.0.1-saulux.10` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.11` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

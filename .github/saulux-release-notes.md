@@ -2,6 +2,12 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**Color-preserving curtains:** add `"sauluxLineKeep":true` to resume the existing
+color, effect and segment brightness on ON and accept live color/brightness changes
+while filling. The default white-ON behavior is retained without the flag.
+An HA Template Light can use this mode for center filling, idempotent power controls,
+color and brightness through a single Yandex Smart Home light device.
+
 **Home Assistant preset compatibility:** saved `sauluxLine` commands now convert
 numeric `seg` selectors to the standard object form, such as `"seg":{"id":0}`.
 The live API still accepts `"seg":0`. Resave older numeric presets to make them

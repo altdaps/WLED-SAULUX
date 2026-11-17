@@ -7,7 +7,7 @@
 namespace {
 enum class LineOrigin : uint8_t { Start, End, Center, Edges };
 struct LineTransition {
-  bool active = false, targetOn = false;
+  bool active = false, targetOn = false, keepScene = false;
   LineOrigin origin = LineOrigin::Start;
   uint16_t startLevel = 0, start = 0, stop = 0;
   uint32_t startedAt = 0, duration = 0, fullDuration = 0;
@@ -110,29 +110,40 @@ void handleSauluxLineTransitions() {
   if (changed) strip.trigger();
 }
 
-// Ordinary segment controls override only the affected segment. Master controls
-// and rebuilding the segment list override all lines, including via HA.
+// Ordinary controls override their segment. A keep-scene pass accepts live color
+// and brightness updates while retaining its boundary; master OFF and geometry
+// changes still override it. This lets an HA light expose the curtain naturally.
 void cancelSauluxLineTransitions(JsonObject root) {
   std::lock_guard<std::mutex> lock(lineMutex);
   const bool powerChange = (root["on"].is<bool>() && root["on"].as<bool>() != bool(bri)) || root["on"].is<const char*>();
   const bool brightnessChange = root.containsKey("bri") && (!root["bri"].is<int>() || root["bri"].as<int>() != bri);
-  if (powerChange || brightnessChange || root.containsKey("live") || (root["rSeg"] | false)) {
+  if (powerChange || root.containsKey("live") || (root["rSeg"] | false)) {
     for (auto& line : lines) line.active = false;
     return;
   }
+  if (brightnessChange) for (auto& line : lines) if (!line.keepScene) line.active = false;
   const auto cancelSegment = [](JsonObject segment, int fallback) {
     if (segment.isNull()) return;
-    bool changesLight = false;
+    bool changesLight = false, liveControls = true;
     for (JsonPair field : segment) {
       const char* key = field.key().c_str();
-      if (strncmp(key, "id", sizeof("id")) && strncmp(key, "sel", sizeof("sel")) && strncmp(key, "n", sizeof("n"))) changesLight = true;
+      if (!strncmp(key, "id", sizeof("id")) || !strncmp(key, "sel", sizeof("sel")) || !strncmp(key, "n", sizeof("n"))) continue;
+      changesLight = true;
+      if (strncmp(key, "on", sizeof("on")) && strncmp(key, "bri", sizeof("bri")) && strncmp(key, "col", sizeof("col"))
+          && strncmp(key, "cct", sizeof("cct")) && strncmp(key, "fx", sizeof("fx")) && strncmp(key, "pal", sizeof("pal"))
+          && strncmp(key, "frz", sizeof("frz"))) liveControls = false;
     }
     if (!changesLight) return; // selecting/naming a segment is not a lighting command
+    const auto cancelLine = [&](unsigned id) {
+      auto& line = lines[id];
+      const bool sameTarget = segment["on"].isNull() || (segment["on"].is<bool>() && segment["on"].as<bool>() == line.targetOn);
+      if (!line.keepScene || !liveControls || !sameTarget) line.active = false;
+    };
     const int id = segment["id"] | fallback;
-    if (id >= 0 && id < MAX_NUM_SEGMENTS) lines[id].active = false;
+    if (id >= 0 && id < MAX_NUM_SEGMENTS) cancelLine(id);
     else if (id < 0) {
       for (unsigned i = 0; i < strip.getSegmentsNum() && i < MAX_NUM_SEGMENTS; i++)
-        if (strip.getSegment(i).isSelected()) lines[i].active = false;
+        if (strip.getSegment(i).isSelected()) cancelLine(i);
     }
   };
   JsonVariant segments = root["seg"];
@@ -154,6 +165,7 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
   else if (strncmp(direction, "center", sizeof("center")) == 0) origin = LineOrigin::Center;
   else if (strncmp(direction, "edges", sizeof("edges")) == 0) origin = LineOrigin::Edges;
   else return false;
+  if (root.containsKey("sauluxLineKeep") && !root["sauluxLineKeep"].is<bool>()) return false;
   unsigned id = strip.getMainSegmentId();
   if (!readSegmentId(root["seg"], id) || id >= strip.getSegmentsNum() || id >= MAX_NUM_SEGMENTS) return false;
   if (root.containsKey("tt") && !root["tt"].is<int>()) return false;
@@ -179,11 +191,12 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
     // Reversing keeps the existing shape, even if a different direction was
     // requested. A fresh shape only starts after the current pass has finished.
     const LineOrigin anchor = continuing ? line.origin : origin;
+    const bool keepScene = continuing ? line.keepScene : (root["sauluxLineKeep"] | false);
     const uint32_t fullDuration = continuing ? line.fullDuration : uint32_t(fullTime) * 100;
     const uint32_t distance = turnOn ? UINT16_MAX - level : level;
     const uint32_t duration = (fullDuration * distance + UINT16_MAX / 2) / UINT16_MAX;
     segment.startTransition(0); // finish an ordinary transition on the next frame without resetting the effect
-    if (!continuing && turnOn) {
+    if (!continuing && turnOn && !keepScene) {
       const auto oldTransition = strip.getTransition();
       strip.setTransition(0);
       segment.setMode(0, false);
@@ -195,6 +208,9 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
       if (segment.mirror) segment.markForReset();
       segment.reverse = segment.mirror = segment.freeze = false;
       strip.setTransition(oldTransition);
+    } else if (!continuing && turnOn && !segment.opacity) {
+      // A zero-opacity scene is OFF too; restore a visible level while keeping color.
+      segment.setOpacity(255);
     }
     if (!bri) {
       // Restore master power without waking other segments whose ON flags were
@@ -211,6 +227,7 @@ bool applySauluxLineToggle(JsonObject root, uint8_t callMode) {
     line.start = segment.start;
     line.stop = segment.stop;
     line.origin = anchor;
+    line.keepScene = keepScene;
     line.targetOn = turnOn;
     line.startLevel = level;
     line.startedAt = now;
