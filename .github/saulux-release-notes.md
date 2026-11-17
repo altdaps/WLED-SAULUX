@@ -2,6 +2,8 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**Time zone** now includes **Moscow (UTC+3)** and **Saratov (UTC+4)**, both without daylight saving time. Choose the city in **Config → Time & Macros**; set the additional **UTC offset** to **0** if you previously entered the city's offset manually. Upgrading preserves the existing time settings.
+
 Endpoint curtains now work independently per segment. Use
 `{"sauluxLine":"start","seg":0,"tt":20}` and the corresponding `"end"` command;
 change `seg` for another line, or omit it for the main segment. Multiple segments

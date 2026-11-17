@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.7`.
+are not included. Fork releases use versions such as `16.0.1-saulux.8`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**. The three variants share a **4 MB flash layout** so the
@@ -74,6 +74,16 @@ The **Apply settings** button applies only the PHY/status fields; **Save** appli
 external REFCLK, actual flash capacity and boot strap levels (including GPIO12)
 on the real boards before use. Local tests and firmware compilation do not establish
 correct electrical operation.
+
+## Time settings
+
+**Config → Time & Macros → Time zone** includes **Moscow (UTC+3)** (ID 25)
+and **Saratov (UTC+4)** (ID 26), both without daylight saving time. Enable NTP,
+select the city and save. **UTC offset** is an additional correction in seconds;
+set it to **0** if it previously supplied the city's offset manually.
+Existing timezone selections and manual offsets are preserved on upgrade.
+
+The fixed offsets follow [IANA Europe/Moscow and Europe/Saratov](https://data.iana.org/time-zones/tzdb/europe).
 
 ## Independent two-ended light lines
 
@@ -223,11 +233,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.7
-   git push origin saulux-v16.0.1-saulux.7
+   git tag saulux-v16.0.1-saulux.8
+   git push origin saulux-v16.0.1-saulux.8
    ```
 
-The tag suffix (`16.0.1-saulux.7` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.8` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

@@ -16,6 +16,63 @@ release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
 
+class TimezoneTests(unittest.TestCase):
+    def test_city_offsets_and_existing_menu_ids(self):
+        """Run the firmware's table through its bundled converter across whole years."""
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        self.assertIsNotNone(compiler, "A host C++ compiler is required")
+        source = (ROOT / "wled00/ntp.cpp").read_text()
+        definitions = source[source.index("#define TZ_UTC"):source.index("void updateTimezone()")]
+        html = (ROOT / "wled00/data/settings_time.htm").read_text()
+        menu = re.search(r'<select name="TZ">(.*?)</select>', html, re.S)[1]
+        options = re.findall(r'<option value="(\d+)"[^>]*>([^<]+)</option>', menu)
+        self.assertEqual([int(value) for value, _ in options], list(range(27)))
+        self.assertEqual(options[25:], [("25", "Moscow (UTC+3)"), ("26", "Saratov (UTC+4)")])
+        # Existing IDs are persisted on devices; adding cities must not renumber them.
+        previous = ["UTC", "UK", "EUROPE_CENTRAL", "EUROPE_EASTERN", "US_EASTERN",
+                    "US_CENTRAL", "US_MOUNTAIN", "US_ARIZONA", "US_PACIFIC", "CHINA",
+                    "JAPAN", "AUSTRALIA_EASTERN", "NEW_ZEALAND", "NORTH_KOREA", "INDIA",
+                    "SASKACHEWAN", "AUSTRALIA_NORTHERN", "AUSTRALIA_SOUTHERN", "HAWAII",
+                    "NOVOSIBIRSK", "ANCHORAGE", "MX_CENTRAL", "PAKISTAN", "BRASILIA",
+                    "AUSTRALIA_WESTERN"]
+        for value, name in enumerate(previous):
+            self.assertRegex(definitions, rf"#define TZ_{name}\s+{value}\b")
+        with tempfile.TemporaryDirectory() as folder:
+            temp = Path(folder)
+            (temp / "Arduino.h").write_text("#pragma once\n#include <cstdint>\n#include <ctime>\n#ifndef __time_t_defined\n#define __time_t_defined\n#endif\nusing byte = uint8_t;\nusing boolean = bool;\n")
+            (temp / "timezone_native.cpp").write_text('''
+#include <cassert>
+#include <utility>
+#include "src/dependencies/timezone/Timezone.h"
+#define PROGMEM
+''' + definitions + '''
+static_assert(sizeof(TZ_TABLE) / sizeof(TZ_TABLE[0]) == TZ_COUNT, "Timezone count mismatch");
+// Static storage initializes the bundled converter's cached transition dates.
+static Timezone moscow(TZ_TABLE[TZ_MOSCOW].first, TZ_TABLE[TZ_MOSCOW].second);
+static Timezone saratov(TZ_TABLE[TZ_SARATOV].first, TZ_TABLE[TZ_SARATOV].second);
+int main() {
+  tmElements_t date = {};
+  date.Day = 1; date.Month = 1; date.Year = CalendarYrToTm(2024);
+  const time_t begin = makeTime(date);
+  date.Year = CalendarYrToTm(2031);
+  const time_t end = makeTime(date);
+  // Hourly coverage includes DST weekends, leap days and local date/year rollover.
+  for (time_t utc = begin; utc < end; utc += SECS_PER_HOUR) {
+    assert(moscow.toLocal(utc) == utc + 3 * SECS_PER_HOUR);
+    assert(saratov.toLocal(utc) == utc + 4 * SECS_PER_HOUR);
+  }
+}
+''')
+            binary = temp / "timezones"
+            subprocess.run([compiler, "-std=c++17", "-DARDUINO=100",
+                            "-I" + str(temp), "-I" + str(ROOT / "wled00"),
+                            str(temp / "timezone_native.cpp"),
+                            str(ROOT / "wled00/src/dependencies/timezone/Timezone.cpp"),
+                            str(ROOT / "wled00/src/dependencies/time/Time.cpp"),
+                            "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
+
 class ProfileTests(unittest.TestCase):
     def test_native_runtime(self):
         compiler = shutil.which("clang++") or shutil.which("g++")

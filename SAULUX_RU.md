@@ -1,7 +1,7 @@
 # SAULUX — руководство по установке, настройке и управлению
 
 Руководство для форка [altdaps/WLED-SAULUX](https://github.com/altdaps/WLED-SAULUX).
-Описанное поведение соответствует **16.0.1-saulux.7**, включая независимые переходы нескольких сегментов.
+Описанное поведение соответствует **16.0.1-saulux.8**, включая независимые переходы нескольких сегментов.
 
 Прошивка основана на официальной **WLED 16.0.1**, использует **ESP-IDF 4.4 / Arduino 2**
 и предназначена для **ESP32-WROOM-32 без PSRAM**, с физической flash-памятью **4 или 8 МБ**.
@@ -126,13 +126,13 @@
 <a name="firmware-files"></a>
 ## 3. Выбор файла прошивки и объёма flash
 
-Пример имён файлов для версии `16.0.1-saulux.7`:
+Пример имён файлов для версии `16.0.1-saulux.8`:
 
 | Модель | Для OTA | Для первой установки через USB / UART |
 | --- | --- | --- |
-| 2I2O | `WLED_16.0.1-saulux.7_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.7_SAULUX_2I2O_factory.bin` |
-| 5I4O | `WLED_16.0.1-saulux.7_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.7_SAULUX_5I4O_factory.bin` |
-| ETHERNET | `WLED_16.0.1-saulux.7_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.7_SAULUX_ETHERNET_factory.bin` |
+| 2I2O | `WLED_16.0.1-saulux.8_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.8_SAULUX_2I2O_factory.bin` |
+| 5I4O | `WLED_16.0.1-saulux.8_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.8_SAULUX_5I4O_factory.bin` |
+| ETHERNET | `WLED_16.0.1-saulux.8_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.8_SAULUX_ETHERNET_factory.bin` |
 
 В релизе находятся **три варианта прошивки**, каждый в обычном и factory-исполнении,
 а также `SHA256SUMS` и `manifest.json`.
@@ -173,7 +173,7 @@
 Пример для SAULUX ETHERNET и современного `esptool`:
 
 ```sh
-python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.7_SAULUX_ETHERNET_factory.bin
+python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.8_SAULUX_ETHERNET_factory.bin
 ```
 
 Замените порт и имя файла. В Linux порт может иметь вид `/dev/ttyUSB0`, в Windows — `COM4`.
@@ -229,6 +229,24 @@ STA / базового MAC-адреса платы, без двоеточий, �
 Для постоянного адреса удобно использовать резервирование DHCP по MAC-адресу нужного интерфейса.
 Wi-Fi и Ethernet одной платы могут иметь разные IP; поле `ip` в информации об устройстве
 может относиться к другому активному интерфейсу, чем адрес, по которому открыт браузер.
+
+### Время: Москва и Саратов
+
+В версии **16.0.1-saulux.8** в **Config → Time & Macros → Time zone** добавлены:
+
+| Пункт меню | Смещение от UTC | Номер в конфигурации |
+| --- | --- | ---: |
+| `Moscow (UTC+3)` — Москва | +3 часа круглый год | 25 |
+| `Saratov (UTC+4)` — Саратов | +4 часа круглый год | 26 |
+
+Включите **Get time from NTP server**, выберите город и нажмите **Save**.
+Летнее и зимнее время для этих пунктов не переключается.
+Поле **UTC offset** задаёт дополнительную поправку в секундах поверх выбранного пояса.
+Если раньше вы вручную выставляли в нём `10800` или `14400`, при выборе города
+замените эту поправку на **`0`**, иначе смещение сложится дважды.
+Обновление прошивки сохраняет выбранный пояс и ручную поправку; город автоматически не выбирается.
+
+Источник правил: [база часовых поясов IANA](https://data.iana.org/time-zones/tzdb/europe).
 
 <a name="led-settings"></a>
 ## 6. Настройка светодиодов, реле и индикации
@@ -826,9 +844,9 @@ pio run -e saulux_ethernet
 затем подготовьте версию пакета и соберите интерфейс до прошивки:
 
 ```sh
-git checkout saulux-v16.0.1-saulux.7
+git checkout saulux-v16.0.1-saulux.8
 npm ci
-python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.7
+python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.8
 npm run build
 pio run
 ```
@@ -850,23 +868,23 @@ pio run -e esp32dev
 
 ### Выпуск через GitHub Actions
 
-Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.7`.
+Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.8`.
 Тег должен соответствовать базовой версии исходников; новую версию выпускают новым тегом.
 
 Порядок выпуска следующей версии:
 
 1. Сохраните и отправьте изменения в свой репозиторий.
-2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.8`, и отправьте его.
+2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.9`, и отправьте его.
 3. Дождитесь успешного workflow **SAULUX Release**.
 4. Проверьте три OTA-файла, три factory-файла и `SHA256SUMS` в Releases.
 5. Дождитесь успешного развёртывания Pages и проверьте `manifest.json`.
 
-Пример команд для будущей версии `.8`, если её тег ещё не существует:
+Пример команд для будущей версии `.9`, если её тег ещё не существует:
 
 ```sh
 git push origin main
-git tag saulux-v16.0.1-saulux.8
-git push origin saulux-v16.0.1-saulux.8
+git tag saulux-v16.0.1-saulux.9
+git push origin saulux-v16.0.1-saulux.9
 ```
 
 Если запуск по тегу не произошёл, используйте **Actions → SAULUX Release → Run workflow**
