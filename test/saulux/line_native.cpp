@@ -4,6 +4,7 @@
 #include <array>
 #include <algorithm>
 #include <numeric>
+#include <vector>
 using byte = uint8_t;
 #define MAX_NUM_SEGMENTS 4
 inline constexpr uint32_t BLACK = 0;
