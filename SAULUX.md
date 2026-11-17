@@ -1,5 +1,7 @@
 # SAULUX firmware — WLED 16.0.1
 
+[Detailed Russian user guide](SAULUX_RU.md).
+
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes

@@ -1,4 +1,4 @@
-> **SAULUX fork:** device profiles, building, releases and OTA instructions: [SAULUX.md](SAULUX.md).
+> **SAULUX fork:** [Russian user guide](SAULUX_RU.md) · [English documentation](SAULUX.md) — hardware, installation, segments, buttons, MQTT and OTA.
 
 <p align="center">
   <img src="/images/wled_logo_akemi.png">
