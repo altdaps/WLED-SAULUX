@@ -34,7 +34,7 @@ static void checkSnapshot(const char* prefix = "saulux/test") {
   }
 }
 int main() {
-  assert(INPUT_COUNT == (SAULUX_MODEL == 2 ? 5 : 2));
+  assert(INPUT_COUNT == (SAULUX_MODEL == 2 ? 5 : SAULUX_MODEL == 4 ? 1 : 2));
   reset();
   onSauluxMqttConnect();
   assert(client.messages.empty()); // callback only signals the main loop
@@ -53,7 +53,7 @@ int main() {
 
   // Reconnect sends current values for every port, including a button held while offline.
   client.messages.clear(); client.online = false;
-  levels[5] = LOW; advance(100); assert(client.messages.empty());
+  levels[4] = LOW; advance(100); assert(client.messages.empty());
   client.online = true; onSauluxMqttConnect(); advance(10); checkSnapshot();
   client.messages.clear(); onSauluxMqttConnect(); advance(10); checkSnapshot();
 

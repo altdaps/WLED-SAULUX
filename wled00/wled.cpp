@@ -501,6 +501,9 @@ void WLED::setup()
   bool needsCfgSave = deserializeConfigFromFS();
 #ifdef SAULUX
   setupSauluxStatus();
+#if SAULUX_MODEL == 4
+  setupWbMgu();
+#endif
 #endif
   DEBUG_PRINTF_P(PSTR("heap %u\n"), getFreeHeapSize());
 

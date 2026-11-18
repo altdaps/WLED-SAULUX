@@ -5,13 +5,13 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.13`.
+are not included. Fork releases use versions such as `16.0.1-saulux.14`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
-no PSRAM**. The three variants share a **4 MB flash layout** so the
+no PSRAM**, and for WB-MGE v.3 hardware (ESP32-U4WDH, 4 MB, no PSRAM). All variants share a **4 MB flash layout** so the
 same model-specific image can be installed on either flash capacity.
-Each release contains three application images with fixed hardware profiles:
-**SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. A fresh installation
+Each release contains four application images with fixed hardware profiles:
+**SAULUX 2I2O**, **SAULUX 5I4O**, **SAULUX ETHERNET** and **WB-MGU**. A fresh installation
 configures its board immediately. The installed firmware determines the model;
 there is no model selector in the web interface. OTA updates for the same variant
 preserve GPIO settings, Wi-Fi credentials and presets. Upgrading a universal build
@@ -24,16 +24,47 @@ Wi-Fi credentials and presets.
 | SAULUX 2I2O | 18, 4 | 17, 16 | 2 | None |
 | SAULUX 5I4O | 27, 26, 25, 33, 32 | 18, 19, 21, 22 | 12 | 23 |
 | SAULUX ETHERNET | 32, 33 | 16 | None | 2 |
+| WB-MGU (WB-MGE v.3 hardware) | 34 (Config button) | 10, 14 | None | TCA9535 P07 |
 
 The Ethernet profile uses IP101GRI: RX0=25, RX1=26, CRS_DV=27, external 50 MHz
 REFCLK input=0, RESET=5, MDIO=18, TX0=19, TX_EN=21, TX1=22, MDC=23.
 It reuses WLED's `ESP32-ETHERNET-KIT-VE` configuration. The PHY address defaults
 to **1** and can be changed to 0–31 in the SAULUX settings.
-Ethernet remains disabled by default on the other two profiles.
+Ethernet remains disabled by default on the 2I2O and 5I4O profiles.
+
+## WB-MGU hardware profile
+
+`wb_mgu` targets the **WB-MGE v.3 pinout** supplied by the user, with the model
+name **WB-MGU**. It does not target the different WB-MGU v.1/WBE2 pinout.
+The source is [Wiren Board's DIY pin table](https://wiki.wirenboard.com/wiki/WB-MGE_v.3_DIY).
+The ESP32-U4WDH package exposes GPIO10; it must not be used on ordinary WROOM boards.
+
+- LED streams: RS-485-1 TX = GPIO10, RS-485-2 TX = GPIO14.
+- Both transmit enables, GPIO4 and GPIO15, are reserved and set HIGH before LED initialization.
+  They are held by software after startup; boot/reset strap levels are hardware-defined.
+- RTL8201: PHY address **0**, reset GPIO5, MDIO18, MDC23, external REFCLK on GPIO0,
+  and the usual ESP32 RMII pins. The web settings use ETH-KIT wiring with the RTL8201 driver.
+- TCA9535/TCA9555: address `0x20`, SDA32/SCL33, dedicated I2C controller 1.
+  Its GPIOs are reserved from LED/button/relay allocation.
+- P00/P01 terminators and P02/P03 failsafe bias stay LOW/OFF. Vout P06 stays OFF.
+- MIO reset is **P10 = port 1 bit 0 = linear bit 8**, held LOW/OFF following the
+  [production MIO driver](https://github.com/wirenboard/wb-mge/blob/main/main/mio_control.c).
+  The older ESPHome demo uses the wrong linear bit 10; the wiki's reset polarity
+  also differs from production code. This profile follows the production driver.
+- Wi-Fi/Ethernet indicators P04/P05 are active LOW; Status P07 is active HIGH,
+  following the [production LED driver](https://github.com/wirenboard/wb-mge/blob/main/main/indication/leds_control.c).
+  Status uses the SAULUX network heartbeat. Link LEDs show Wi-Fi/AP and Ethernet link state.
+- A failed expander transaction is retried at most once per second; `/json/info`
+  reports initialization status in `wbMgu.expanderReady` and `controlPinsReady`.
+
+The RS-485 transceivers remain differential A/B line drivers; an ordinary LED DIN
+requires the appropriate receiving/level-conversion circuit. Modbus and the internal
+MIO/WBIO functions are disabled in this lighting profile. Vout is the board's input
+supply voltage, not a regulated LED supply.
 
 ## Device identity and LED defaults
 
-The device name and product brand are **SAULUX**. The access point name and mDNS
+The product brand is **SAULUX**. The default device name is **SAULUX**, or **wb-mgu** for WB-MGU. The access point name and mDNS
 hostname are generated from the last six hexadecimal characters of the board's
 STA/base MAC address, without colons, in lowercase. For MAC `AA:BB:CC:12:34:56`:
 
@@ -45,7 +76,7 @@ in Wi-Fi settings. Restoring another board's configuration retains this board's
 unique network identity. Upgrading an earlier build renames its default `WLED`
 display name to `SAULUX`; explicitly customized display names are kept.
 
-All three profiles default to **SK6812 RGBW**, color order **GRBW**, 30 LEDs per
+All four profiles default to **SK6812 RGBW**, color order **GRBW**, 30 LEDs per
 output. The first upgrade from earlier SAULUX defaults changes existing WS2812
 outputs to SK6812 RGBW while keeping their GPIOs, counts, color order and power
 limits. This migration runs once; later explicit LED type changes remain saved.
@@ -53,7 +84,7 @@ WLED project credits, license information and protocol names remain in the inter
 
 ## Device configuration
 
-Install the firmware matching your board: 2I2O, 5I4O or ETHERNET. The model is shown
+Install the firmware matching your board: 2I2O, 5I4O, ETHERNET or WB-MGU. The model is shown
 as read-only information in **Config → LED Preferences → SAULUX device**.
 Changing the model requires uploading the corresponding firmware image. When the
 previously applied model differs, LED outputs, inputs, relay and global I2C/SPI pins
@@ -63,6 +94,7 @@ Preferences. Wi-Fi settings and stored presets are retained; presets containing
 segment ranges may need adjustment after a hardware variant change.
 
 Initial input configuration is momentary buttons, **active LOW with internal pull-ups**.
+WB-MGU uses the board's externally pulled-up GPIO34 Config button (GPIO34 has no internal pull-up).
 Change the button types and preset actions to match the connected equipment.
 The relay defaults to **active HIGH**; its polarity is adjustable in Hardware setup.
 The status LED defaults to active HIGH and has an **active LOW** option in the SAULUX section.
@@ -229,7 +261,7 @@ npm run build
 pio run
 ```
 
-The default environments are `saulux_2i2o`, `saulux_5i4o` and `saulux_ethernet`.
+The default environments are `saulux_2i2o`, `saulux_5i4o`, `saulux_ethernet` and `wb_mgu`.
 Build one with, for example, `pio run -e saulux_5i4o`.
 Outputs are written to `build_output/release/`:
 
@@ -238,6 +270,7 @@ Outputs are written to `build_output/release/`:
 | SAULUX 2I2O | `WLED_<version>_SAULUX_2I2O.bin` |
 | SAULUX 5I4O | `WLED_<version>_SAULUX_5I4O.bin` |
 | SAULUX ETHERNET | `WLED_<version>_SAULUX_ETHERNET.bin` |
+| WB-MGU | `WLED_<version>_WB_MGU.bin` |
 
 The shared partition table is `tools/WLED_ESP32_4MB_1MB_FS.csv`: two 1.5 MiB OTA
 application slots and a 960 KiB filesystem, all within the first 4 MiB. On an 8 MB
@@ -275,7 +308,7 @@ The 16.x builds use the separate firmware compatibility identifier **`SAULUX_16`
 Normal firmware validation rejects direct OTA between the previous `SAULUX` family
 and this family. **Do not bypass this with Ignore firmware validation.** Normal
 validation remains enabled for subsequent 16.x Auto updates from this repository.
-The three OTA asset filenames still identify the hardware model, as listed above.
+The four OTA asset filenames still identify the hardware model, as listed above.
 
 Ordinary OTA retains the installed partition table. A factory image written at
 `0x0` also includes a fresh OTA-selection record for a consistent first boot.
@@ -289,15 +322,15 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.13
-   git push origin saulux-v16.0.1-saulux.13
+   git tag saulux-v16.0.1-saulux.14
+   git push origin saulux-v16.0.1-saulux.14
    ```
 
-The tag suffix (`16.0.1-saulux.13` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.14` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
-three firmware variants, publishes their OTA/factory images and SHA256 checksums, and deploys
+four firmware variants, publishes their OTA/factory images and SHA256 checksums, and deploys
 the same files plus `manifest.json` to:
 
 `https://altdaps.github.io/WLED-SAULUX/`
@@ -311,7 +344,7 @@ Normal firmware validation stays enabled. Interrupted/failed downloads are not u
 
 Each board downloads the application matching its compiled hardware variant, exposed
 as `otaRelease` in `/json/info`. The shared `release: "SAULUX_16"` field enables normal
-firmware validation across these three 16.x variants while separating them from
+firmware validation across these four 16.x variants while separating them from
 the previous ESP-IDF 5 family. Saved or restored model fields cannot redirect OTA to another variant.
 No firmware is downloaded from the upstream repository or the WLED proxy in SAULUX
 builds. Inherited upstream nightly publishing is disabled in this fork.

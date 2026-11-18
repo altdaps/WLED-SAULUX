@@ -1,10 +1,11 @@
 # SAULUX — руководство по установке, настройке и управлению
 
 Руководство для форка [altdaps/WLED-SAULUX](https://github.com/altdaps/WLED-SAULUX).
-Описанное поведение соответствует **16.0.1-saulux.13**, включая независимые переходы нескольких сегментов.
+Описанное поведение соответствует **16.0.1-saulux.14**, включая независимые переходы нескольких сегментов.
 
 Прошивка основана на официальной **WLED 16.0.1**, использует **ESP-IDF 4.4 / Arduino 2**
-и предназначена для **ESP32-WROOM-32 без PSRAM**, с физической flash-памятью **4 или 8 МБ**.
+и предназначена для **ESP32-WROOM-32 без PSRAM**, с физической flash-памятью **4 или 8 МБ**,
+а также WB-MGE v.3 на **ESP32-U4WDH с 4 МБ** (профиль WB-MGU).
 Название устройства и оформление — **SAULUX**; JSON API и интеграция WLED остаются совместимыми.
 
 - [Скачать прошивки](https://github.com/altdaps/WLED-SAULUX/releases).
@@ -111,6 +112,47 @@
 Используется профиль WLED `ESP32-ETHERNET-KIT-VE` с `ETH_PHY_IP101` и `ETH_CLOCK_GPIO0_IN`.
 Адрес PHY можно изменить в пределах **0–31** в разделе SAULUX настроек светодиодов.
 
+### WB-MGU — профиль для WB-MGE v.3
+
+Название модели — **WB-MGU**, окружение сборки — `wb_mgu`. Профиль рассчитан
+на распиновку [WB-MGE v.3 DIY](https://wiki.wirenboard.com/wiki/WB-MGE_v.3_DIY),
+а не на другую аппаратную модель WB-MGU v.1 с шиной WBE2.
+
+| Назначение | Подключение |
+| --- | --- |
+| Выход ленты 1 / RS-485-1 TX | GPIO10 |
+| Выход ленты 2 / RS-485-2 TX | GPIO14 |
+| Разрешение передачи RS-485-1 / RS-485-2 | GPIO4 / GPIO15, постоянно HIGH после запуска |
+| Кнопка Config | GPIO34, активный LOW, аппаратная подтяжка платы |
+| Ethernet | RTL8201, адрес PHY 0, reset GPIO5, MDC23, MDIO18, REFCLK0 |
+| Расширитель GPIO | TCA9535/TCA9555, адрес 0x20, SDA32, SCL33 |
+| Терминаторы RS-485 | P00 и P01, выключены |
+| Подтяжки failsafe bias RS-485 | P02 и P03, выключены |
+| Выход питания Vout | P06, выключен |
+| Сброс внутреннего MIO | P10 — бит 8, LOW удерживает MIO в сбросе |
+| Индикаторы Wi-Fi / Ethernet | P04 / P05, активный LOW |
+| Индикатор Status | P07, активный HIGH, сетевое мигание SAULUX |
+
+**P10 расширителя — это бит 8, а не бит 10.** В старом примере ESPHome и таблице
+вики есть расхождения; номер и уровень сброса MIO взяты из
+[основной прошивки Wiren Board](https://github.com/wirenboard/wb-mge/blob/main/main/mio_control.c),
+полярности индикаторов — из [её драйвера LED](https://github.com/wirenboard/wb-mge/blob/main/main/indication/leds_control.c).
+Инициализация записывает уровни до включения выходных драйверов расширителя.
+При ошибке I²C выполняется повторная попытка не чаще раза в секунду;
+`/json/info` содержит `wbMgu.expanderReady` и `wbMgu.controlPinsReady`.
+
+GPIO4, GPIO15, GPIO32 и GPIO33 зарезервированы от назначения другим функциям.
+GPIO10 доступен на ESP32-U4WDH этой платы; использовать такую прошивку на обычной
+ESP32-WROOM нельзя. Уровни GPIO4/15 при аппаратном сбросе определяются самой платой;
+программа устанавливает HIGH до запуска драйверов ленты.
+
+Клеммы A/B остаются дифференциальными выходами RS-485. Для обычного DIN ленты
+нужен соответствующий приёмник/преобразователь. Modbus и внутренний MIO/WBIO
+в этом профиле отключены. Vout выдаёт напряжение питания модуля, а не стабилизированное
+питание для светодиодов. Настройка по умолчанию — по 30 SK6812 RGBW/GRBW на выход.
+При переходе со стороннего WLED профиль заменяет разметку выходов; прежняя матрица,
+длины и типы лент требуют повторной настройки. Сеть и файл пресетов сохраняются.
+
 ### Логика входов и реле
 
 Начальный тип входов — **кнопка без фиксации**, активный уровень **LOW**, внутренние подтяжки включены.
@@ -126,15 +168,16 @@
 <a name="firmware-files"></a>
 ## 3. Выбор файла прошивки и объёма flash
 
-Пример имён файлов для версии `16.0.1-saulux.13`:
+Пример имён файлов для версии `16.0.1-saulux.14`:
 
 | Модель | Для OTA | Для первой установки через USB / UART |
 | --- | --- | --- |
-| 2I2O | `WLED_16.0.1-saulux.13_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.13_SAULUX_2I2O_factory.bin` |
-| 5I4O | `WLED_16.0.1-saulux.13_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.13_SAULUX_5I4O_factory.bin` |
-| ETHERNET | `WLED_16.0.1-saulux.13_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.13_SAULUX_ETHERNET_factory.bin` |
+| 2I2O | `WLED_16.0.1-saulux.14_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.14_SAULUX_2I2O_factory.bin` |
+| 5I4O | `WLED_16.0.1-saulux.14_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.14_SAULUX_5I4O_factory.bin` |
+| ETHERNET | `WLED_16.0.1-saulux.14_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.14_SAULUX_ETHERNET_factory.bin` |
+| WB-MGU | `WLED_16.0.1-saulux.14_WB_MGU.bin` | `WLED_16.0.1-saulux.14_WB_MGU_factory.bin` |
 
-В релизе находятся **три варианта прошивки**, каждый в обычном и factory-исполнении,
+В релизе находятся **четыре варианта прошивки**, каждый в обычном и factory-исполнении,
 а также `SHA256SUMS` и `manifest.json`.
 
 **Обычный `.bin`** содержит приложение и применяется для OTA.
@@ -173,7 +216,7 @@
 Пример для SAULUX ETHERNET и современного `esptool`:
 
 ```sh
-python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.13_SAULUX_ETHERNET_factory.bin
+python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.14_SAULUX_ETHERNET_factory.bin
 ```
 
 Замените порт и имя файла. В Linux порт может иметь вид `/dev/ttyUSB0`, в Windows — `COM4`.
@@ -610,7 +653,7 @@ curl --fail --silent --show-error http://192.168.1.50/json/info
 | `ver` | Версия установленной прошивки |
 | `brand`, `product` | Название SAULUX |
 | `release` | Семейство совместимости `SAULUX_16` |
-| `otaRelease` | Вариант: `SAULUX_2I2O`, `SAULUX_5I4O` или `SAULUX_ETHERNET` |
+| `otaRelease` | Вариант: `SAULUX_2I2O`, `SAULUX_5I4O`, `SAULUX_ETHERNET` или `WB_MGU` |
 | `repo` | Репозиторий форка |
 | `otaBase` | Адрес файлов OTA |
 | `mac` | Идентификатор MAC, используемый API |
@@ -940,13 +983,14 @@ npm run build
 pio run
 ```
 
-`pio run` собирает три окружения по умолчанию:
+`pio run` собирает четыре окружения по умолчанию:
 
 | Окружение | Модель |
 | --- | --- |
 | `saulux_2i2o` | 2I2O |
 | `saulux_5i4o` | 5I4O |
 | `saulux_ethernet` | ETHERNET |
+| `wb_mgu` | WB-MGU (аппаратная часть WB-MGE v.3) |
 
 Сборка только Ethernet-варианта:
 
@@ -961,9 +1005,9 @@ pio run -e saulux_ethernet
 затем подготовьте версию пакета и соберите интерфейс до прошивки:
 
 ```sh
-git checkout saulux-v16.0.1-saulux.13
+git checkout saulux-v16.0.1-saulux.14
 npm ci
-python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.13
+python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.14
 npm run build
 pio run
 ```
@@ -985,23 +1029,23 @@ pio run -e esp32dev
 
 ### Выпуск через GitHub Actions
 
-Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.13`.
+Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.14`.
 Тег должен соответствовать базовой версии исходников; новую версию выпускают новым тегом.
 
 Порядок выпуска следующей версии:
 
 1. Сохраните и отправьте изменения в свой репозиторий.
-2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.14`, и отправьте его.
+2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.15`, и отправьте его.
 3. Дождитесь успешного workflow **SAULUX Release**.
-4. Проверьте три OTA-файла, три factory-файла и `SHA256SUMS` в Releases.
+4. Проверьте четыре OTA-файла, четыре factory-файла и `SHA256SUMS` в Releases.
 5. Дождитесь успешного развёртывания Pages и проверьте `manifest.json`.
 
-Пример команд для будущей версии `.14`, если её тег ещё не существует:
+Пример команд для будущей версии `.15`, если её тег ещё не существует:
 
 ```sh
 git push origin main
-git tag saulux-v16.0.1-saulux.14
-git push origin saulux-v16.0.1-saulux.14
+git tag saulux-v16.0.1-saulux.15
+git push origin saulux-v16.0.1-saulux.15
 ```
 
 Если запуск по тегу не произошёл, используйте **Actions → SAULUX Release → Run workflow**
@@ -1019,12 +1063,13 @@ git push origin saulux-v16.0.1-saulux.14
 две анимированные палитры и сохранение короткого API-пресета без его выполнения.
 После временной тестовой разметки исходные диапазоны, конфигурация и пресеты были восстановлены.
 
-Все три варианта прошивки собираются отдельно. Успешная сборка и host-тесты
+Все четыре варианта прошивки собираются отдельно. Успешная сборка и host-тесты
 не заменяют проверку реальных входов, реле и сетевой части каждой аппаратной платы.
 
 Исходники проекта:
 
 - [Аппаратные профили, имена и индикация](wled00/saulux.cpp).
+- [Постоянные разрешения TX и расширитель WB-MGU](wled00/saulux_wb_mgu.cpp).
 - [Независимые переходы сегментов](wled00/saulux_line.cpp).
 - [Публикация кнопок MQTT](wled00/saulux_mqtt.cpp).
 - [Три окружения PlatformIO](platformio_saulux.ini).

@@ -24,6 +24,12 @@ bool getSauluxStatusInverted();
 void handleSauluxReboot();
 void setupSauluxStatus();
 void handleSauluxStatus();
+#if SAULUX_MODEL == 4
+void reserveWbMguPins();
+void setupWbMgu();
+void handleWbMgu();
+void addWbMguInfo(JsonObject root);
+#endif
 #ifndef WLED_DISABLE_MQTT
 void onSauluxMqttConnect();
 void handleSauluxMqttInputs();

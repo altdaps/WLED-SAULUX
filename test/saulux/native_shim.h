@@ -13,10 +13,16 @@ public:
   using std::string::string;
   long toInt() const { return std::strtol(c_str(), nullptr, 10); }
 };
-enum class PinOwner { StatusLED };
+enum class PinOwner { StatusLED, BoardControl };
+struct PinManagerPinType { int8_t pin; bool isOutput; };
 namespace PinManager {
 inline std::set<int> allocated;
 inline bool allocatePin(int pin, bool, PinOwner) { return allocated.insert(pin).second; }
+inline bool allocateMultiplePins(const PinManagerPinType* pins, unsigned count, PinOwner) {
+  for (unsigned i = 0; i < count; i++) if (allocated.count(pins[i].pin)) return false;
+  for (unsigned i = 0; i < count; i++) allocated.insert(pins[i].pin);
+  return true;
+}
 }
 inline constexpr int LOW = 0, HIGH = 1, OUTPUT = 3;
 inline constexpr int TYPE_WS2812_RGB = 22, COL_ORDER_GRB = 0, BTN_TYPE_PUSH = 2;

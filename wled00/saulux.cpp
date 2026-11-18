@@ -14,12 +14,14 @@ struct SauluxProfile {
 constexpr SauluxProfile PROFILES[] = {
   {{18, 4, -1, -1, -1}, {17, 16, -1, -1}, 2, -1},
   {{27, 26, 25, 33, 32}, {18, 19, 21, 22}, 12, 23},
-  {{32, 33, -1, -1, -1}, {16, -1, -1, -1}, -1, 2}
+  {{32, 33, -1, -1, -1}, {16, -1, -1, -1}, -1, 2},
+  {{34, -1, -1, -1, -1}, {10, 14, -1, -1}, -1, -1}
 };
 constexpr uint8_t MODEL_COUNT = sizeof(PROFILES) / sizeof(PROFILES[0]);
 constexpr uint8_t LED_DEFAULTS_VERSION = 1;
 static_assert(SAULUX_MODEL >= 1 && SAULUX_MODEL <= MODEL_COUNT, "Invalid SAULUX model");
-uint8_t phyAddress = 1;
+constexpr uint8_t DEFAULT_PHY_ADDRESS = SAULUX_MODEL == 4 ? 0 : 1;
+uint8_t phyAddress = DEFAULT_PHY_ADDRESS;
 bool statusInverted = false;
 bool rebootPending = false;
 int8_t statusPin = -1;
@@ -33,6 +35,7 @@ const char* getSauluxOtaRelease() {
     case 1: return "SAULUX_2I2O";
     case 2: return "SAULUX_5I4O";
     case 3: return "SAULUX_ETHERNET";
+    case 4: return "WB_MGU";
     default: return "SAULUX";
   }
 }
@@ -70,8 +73,9 @@ static bool prepareSauluxIdentity(JsonObject root) {
     changed = true;
   }
   const char* name = id["name"] | "";
-  if (name[0] == '\0' || strncmp(name, "WLED", sizeof("WLED")) == 0) {
-    id["name"] = "SAULUX";
+  if (name[0] == '\0' || strncmp(name, "WLED", sizeof("WLED")) == 0
+      || (SAULUX_MODEL == 4 && strncmp(name, "WLED_WB_MGE_V3", sizeof("WLED_WB_MGE_V3")) == 0)) {
+    id["name"] = SAULUX_MODEL == 4 ? "wb-mgu" : "SAULUX";
     changed = true;
   }
   return changed;
@@ -101,10 +105,13 @@ bool prepareSauluxConfig(JsonObject root) {
   bool needsSave = prepareSauluxIdentity(root);
   // Old menu selections and restored configs cannot change the compiled model.
   needsSave |= (root["saulux"]["model"] | -1) != SAULUX_MODEL;
-  const int address = root["saulux"]["phyAddress"] | 1;
-  phyAddress = address >= 0 && address <= 31 ? address : 1;
+  const int address = root["saulux"]["phyAddress"] | int(DEFAULT_PHY_ADDRESS);
+  phyAddress = address >= 0 && address <= 31 ? address : DEFAULT_PHY_ADDRESS;
   statusInverted = root["saulux"]["statusInverted"] | false;
   const int applied = root["saulux"]["applied"] | -1;
+#if SAULUX_MODEL == 4
+  reserveWbMguPins();
+#endif
   const auto& profile = PROFILES[SAULUX_MODEL - 1];
   if (profile.status >= 0 && PinManager::allocatePin(profile.status, true, PinOwner::StatusLED)) statusPin = profile.status;
   if (applied == SAULUX_MODEL) {
@@ -152,7 +159,7 @@ bool prepareSauluxConfig(JsonObject root) {
   i2c.add(-1); i2c.add(-1);
   JsonArray spi = interfaces.createNestedArray("spi-pin");
   spi.add(-1); spi.add(-1); spi.add(-1);
-  root.createNestedObject("eth")["type"] = SAULUX_MODEL == 3 ? WLED_ETH_ESP32ETHKITVE : WLED_ETH_NONE;
+  root.createNestedObject("eth")["type"] = SAULUX_MODEL >= 3 ? WLED_ETH_ESP32ETHKITVE : WLED_ETH_NONE;
   return true;
 }
 
@@ -174,6 +181,9 @@ void setupSauluxStatus() {
 
 // Blink faster when connected, slowly in AP mode, and turn off when disconnected.
 void handleSauluxStatus() {
+#if SAULUX_MODEL == 4
+  handleWbMgu();
+#endif
   if (statusPin < 0) return;
   const uint32_t interval = Network.isConnected() ? 500 : apActive ? 1000 : 0;
   if (!interval) statusOn = false;

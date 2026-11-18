@@ -49,6 +49,7 @@ enum struct PinOwner : uint8_t {
   DMX_INPUT     = 0x8D,   // 'DMX_INPUT' == DMX input via serial
   HUB75         = 0x8E,   // 'Hub75' == Hub75 driver
   StatusLED     = 0x8F,   // SAULUX model-specific status LED
+  BoardControl  = 0x90,   // Fixed RS-485 direction and expander bus pins
   // Use UserMod IDs from const.h here
   UM_Unspecified       = USERMOD_ID_UNSPECIFIED,        // 0x01
   UM_Example           = USERMOD_ID_EXAMPLE,            // 0x02 // Usermod "usermod_v2_example.h"

@@ -1,6 +1,15 @@
 SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4.4 / Arduino 2 platform.
 
-Three fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O** and **SAULUX ETHERNET**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
+Four fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O**, **SAULUX ETHERNET** and **WB-MGU**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
+
+**New WB-MGU build (WB-MGE v.3 pinout):** LED outputs GPIO10/14, permanently
+asserted transmit enables GPIO4/15, RTL8201 Ethernet at address 0, and a reserved
+TCA9535 bus on SDA32/SCL33. MIO reset uses P10/linear bit 8 and the production
+firmware's LOW polarity; terminators, failsafe bias and Vout stay disabled.
+Config button GPIO34 and Wi-Fi/Ethernet/Status indicators are supported.
+The different WB-MGU v.1/WBE2 hardware is not targeted. First installation from
+another WLED build initializes two 30-pixel SK6812 RGBW outputs; reconfigure
+existing matrix geometry, LED types and lengths after migration. Wi-Fi and presets remain.
 
 **Transitions during live power curtains:** keep-scene mode now renders both
 old and new scenes, preserving native color/effect transitions such as Outside In

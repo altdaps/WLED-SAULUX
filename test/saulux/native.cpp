@@ -4,17 +4,24 @@
 #include "saulux_runtime.cpp"
 #include "save_flag.cpp"
 
+#if SAULUX_MODEL == 4
+void reserveWbMguPins() {
+  for (int pin : {4, 15, 32, 33}) PinManager::allocated.insert(pin);
+}
+void handleWbMgu() {}
+#endif
+
 static void freshPins() {
   statusPin = -1;
   PinManager::allocated.clear();
 }
 
 int main() {
-  const int expectedInputs[][5] = {{18,4,-1,-1,-1}, {27,26,25,33,32}, {32,33,-1,-1,-1}};
-  const int expectedOutputs[][4] = {{17,16,-1,-1}, {18,19,21,22}, {16,-1,-1,-1}};
-  const int expectedRelay[] = {2,12,-1};
-  const int expectedStatus[] = {-1,23,2};
-  const char* expectedRelease[] = {"SAULUX", "SAULUX_2I2O", "SAULUX_5I4O", "SAULUX_ETHERNET"};
+  const int expectedInputs[][5] = {{18,4,-1,-1,-1}, {27,26,25,33,32}, {32,33,-1,-1,-1}, {34,-1,-1,-1,-1}};
+  const int expectedOutputs[][4] = {{17,16,-1,-1}, {18,19,21,22}, {16,-1,-1,-1}, {10,14,-1,-1}};
+  const int expectedRelay[] = {2,12,-1,-1};
+  const int expectedStatus[] = {-1,23,2,-1};
+  const char* expectedRelease[] = {"SAULUX", "SAULUX_2I2O", "SAULUX_5I4O", "SAULUX_ETHERNET", "WB_MGU"};
   {
     char hostname[14] = {};
     escapedMac = "AABBCCDDEEFF";
@@ -40,7 +47,7 @@ int main() {
     root["id"]["mdns"] = "wled-123456";
     root["ap"]["ssid"] = "SAULUX-AP";
     assert(prepareSauluxConfig(root));
-    assert(root["id"]["name"] == "SAULUX");
+    assert(root["id"]["name"] == (SAULUX_MODEL == 4 ? "wb-mgu" : "SAULUX"));
     assert(root["id"]["mdns"] == "saulux-123456");
     assert(root["ap"]["ssid"] == "saulux-123456");
     serializeSauluxConfig(root);
@@ -54,6 +61,14 @@ int main() {
     assert(root["id"]["mdns"] == "saulux-000002");
     assert(root["ap"]["ssid"] == "saulux-000002");
     escapedMac = "aabbcc123456";
+  }
+  if (SAULUX_MODEL == 4) {
+    freshPins();
+    DynamicJsonDocument document(4096);
+    JsonObject root = document.to<JsonObject>();
+    root["id"]["name"] = "WLED_WB_MGE_V3";
+    prepareSauluxConfig(root);
+    assert(root["id"]["name"] == "wb-mgu");
   }
   // Migrate the prior WS2812 default once, keeping counts, pins, color and current limits.
   {
@@ -85,7 +100,7 @@ int main() {
   }
   // Fresh, universal and foreign model configurations all use the compiled GPIO map.
   const int model = SAULUX_MODEL;
-  for (int stored : {-1, 0, 1, 2, 3, 999}) {
+  for (int stored : {-1, 0, 1, 2, 3, 4, 999}) {
     freshPins();
     DynamicJsonDocument document(16384);
     JsonObject root = document.to<JsonObject>();
@@ -95,7 +110,7 @@ int main() {
     assert(prepareSauluxConfig(root));
     assert(std::string(getSauluxOtaRelease()) == expectedRelease[model]);
     assert(statusPin == expectedStatus[model - 1]);
-    assert(root["eth"]["type"] == (model == 3 ? 7 : 0));
+    assert(root["eth"]["type"] == (model >= 3 ? 7 : 0));
     std::set<int> pins = PinManager::allocated;
     JsonArray buses = root["hw"]["led"]["ins"];
     size_t outputCount = 0;
@@ -122,7 +137,7 @@ int main() {
     assert(root["hw"]["relay"]["pin"] == expectedRelay[model - 1]);
     assert(root["hw"]["relay"]["rev"] == false);
     if (expectedRelay[model - 1] >= 0) assert(pins.insert(expectedRelay[model - 1]).second);
-    if (model == 3) {
+    if (model >= 3) {
       for (int pin : {25,26,27,0,5,18,19,21,22,23}) assert(pins.insert(pin).second);
     }
     assert(root["nw"]["ins"][0]["ssid"] == "keep-wifi");
@@ -160,7 +175,7 @@ int main() {
   root["saulux"]["phyAddress"] = 999;
   freshPins();
   assert(prepareSauluxConfig(root));
-  assert(getSauluxPhyAddress() == 1);
+  assert(getSauluxPhyAddress() == (SAULUX_MODEL == 4 ? 0 : 1));
   // A complete usermod config must not erase the profile migration's save request.
   for (bool complete : {true, false}) {
     freshPins();
