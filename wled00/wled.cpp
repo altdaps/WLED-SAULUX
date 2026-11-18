@@ -501,6 +501,7 @@ void WLED::setup()
   bool needsCfgSave = deserializeConfigFromFS();
 #ifdef SAULUX
   setupSauluxStatus();
+  ensureSauluxPresets();
 #if SAULUX_MODEL == 4
   setupWbMgu();
 #endif

@@ -2,6 +2,13 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Four fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O**, **SAULUX ETHERNET** and **WB-MGU**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**Three built-in line presets on every model:** `Line START`, `Line END` and
+`Line CENTER` appear automatically at boot. Each uses segment 0, white startup,
+live color controls and a one-second full pass; repeated calls reverse/toggle it.
+Fresh installations use IDs 1–3. Upgrades use free IDs without replacing user
+presets or applying a scene. Marked renames/edits persist; deleted built-ins return
+at the next boot. Full or corrupt files are not overwritten.
+
 **New WB-MGU build (WB-MGE v.3 pinout):** LED outputs GPIO10/14, permanently
 asserted transmit enables GPIO4/15, RTL8201 Ethernet at address 0, and a reserved
 TCA9535 bus on SDA32/SCL33. MIO reset uses P10/linear bit 8 and the production

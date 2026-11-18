@@ -96,6 +96,20 @@ class ProfileTests(unittest.TestCase):
                                     "-o", str(binary)], check=True)
                     subprocess.run([str(binary)], check=True)
 
+    def test_builtin_presets(self):
+        """Run the firmware seeder against occupied and damaged preset files."""
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as folder:
+            temp = Path(folder)
+            source = (ROOT / "wled00/saulux_presets.cpp").read_text()
+            (temp / "presets_runtime.cpp").write_text(source.replace('#include "wled.h"', '#include "presets_shim.h"'))
+            binary = temp / "presets"
+            subprocess.run([compiler, "-std=c++17", "-DSAULUX", "-I" + str(temp),
+                            "-I" + str(ROOT / "test/saulux"), "-I" + str(ROOT / "wled00"),
+                            str(ROOT / "test/saulux/presets_native.cpp"), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_wb_mgu_board_controls(self):
         """Run the real board init/status driver against an I2C register model."""
         compiler = shutil.which("clang++") or shutil.which("g++")

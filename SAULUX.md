@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.14`.
+are not included. Fork releases use versions such as `16.0.1-saulux.15`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**, and for WB-MGE v.3 hardware (ESP32-U4WDH, 4 MB, no PSRAM). All variants share a **4 MB flash layout** so the
@@ -116,6 +116,37 @@ set it to **0** if it previously supplied the city's offset manually.
 Existing timezone selections and manual offsets are preserved on upgrade.
 
 The fixed offsets follow [IANA Europe/Moscow and Europe/Saratov](https://data.iana.org/time-zones/tzdb/europe).
+
+## Included line presets
+
+Every hardware variant includes three API presets, created automatically before
+LED output starts at boot:
+
+| Fresh-install ID | Name | White ON direction |
+| --- | --- | --- |
+| 1 | `Line START` | First pixel / DIN end toward the last pixel |
+| 2 | `Line END` | Last pixel toward the first pixel |
+| 3 | `Line CENTER` | Center toward both ends |
+
+Each controls **1D segment 0**, with a **one-second full pass** (`tt:10`). Calling
+it again turns the segment off in reverse; calling during a pass reverses from
+its current position. Brightness and segment bounds are retained. A fresh ON is
+white, with live color/brightness controls through `sauluxLineKeep` and
+`sauluxLineWhite`; OFF and active reversals retain their scene.
+
+On upgrades, occupied preset IDs are preserved and built-ins use the first free
+slots in 1–250. No preset is applied and no button assignment changes during
+creation. The `sauluxBuiltin` marker identifies each built-in across renaming and
+editing; marked user edits are kept. A deleted built-in is recreated on the next
+boot. Remove that marker when copying a built-in into an independent user preset.
+For another line, change `seg.id` in a copy. HA can list these presets because
+they contain `seg:{"id":0}`. They do not create HA Template Light entities.
+
+The seeder validates and filters the existing JSON file before writing, preserves
+user scene data and uses no additional large document. Unreadable/corrupt files
+are left untouched. A full 250-slot file requires freeing slots; existing presets
+are never replaced. Partial initialization is completed on a later boot without
+duplicating the presets already created.
 
 ## Independent directional light lines
 
@@ -322,11 +353,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.14
-   git push origin saulux-v16.0.1-saulux.14
+   git tag saulux-v16.0.1-saulux.15
+   git push origin saulux-v16.0.1-saulux.15
    ```
 
-The tag suffix (`16.0.1-saulux.14` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.15` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the
