@@ -9,6 +9,8 @@ void reserveWbMguPins() {
   for (int pin : {4, 15, 32, 33}) PinManager::allocated.insert(pin);
 }
 void handleWbMgu() {}
+void readWbMguConfig(JsonObject) {}
+void serializeWbMguConfig(JsonObject) {}
 #endif
 
 static void freshPins() {

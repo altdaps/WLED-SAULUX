@@ -1,7 +1,7 @@
 # SAULUX — руководство по установке, настройке и управлению
 
 Руководство для форка [altdaps/WLED-SAULUX](https://github.com/altdaps/WLED-SAULUX).
-Описанное поведение соответствует **16.0.1-saulux.15**, включая независимые переходы нескольких сегментов.
+Описанное поведение соответствует **16.0.1-saulux.16**, включая независимые переходы нескольких сегментов.
 
 Прошивка основана на официальной **WLED 16.0.1**, использует **ESP-IDF 4.4 / Arduino 2**
 и предназначена для **ESP32-WROOM-32 без PSRAM**, с физической flash-памятью **4 или 8 МБ**,
@@ -126,7 +126,7 @@
 | Кнопка Config | GPIO34, активный LOW, аппаратная подтяжка платы |
 | Ethernet | RTL8201, адрес PHY 0, reset GPIO5, MDC23, MDIO18, REFCLK0 |
 | Расширитель GPIO | TCA9535/TCA9555, адрес 0x20, SDA32, SCL33 |
-| Терминаторы RS-485 | P00 и P01, выключены |
+| Терминаторы RS-485 | P00 и P01, раздельное управление из LED & Hardware, по умолчанию выключены |
 | Подтяжки failsafe bias RS-485 | P02 и P03, выключены |
 | Выход питания Vout | P06, выключен |
 | Сброс внутреннего MIO | P10 — бит 8, LOW удерживает MIO в сбросе |
@@ -153,6 +153,27 @@ ESP32-WROOM нельзя. Уровни GPIO4/15 при аппаратном сб
 При переходе со стороннего WLED профиль заменяет разметку выходов; прежняя матрица,
 длины и типы лент требуют повторной настройки. Сеть и файл пресетов сохраняются.
 
+### Управление терминаторами WB-MGE
+
+Начиная с **16.0.1-saulux.16**, только у этого профиля в
+**Config → LED & Hardware → SAULUX device** появляется блок **WB-MGE RS-485**:
+
+- **RS-485 port 1 terminator** — терминатор первого порта, P00 расширителя.
+- **RS-485 port 2 terminator** — терминатор второго порта, P01 расширителя.
+
+Выберите нужные состояния и нажмите **Save terminators**. Они применяются без
+перезагрузки и сохраняются после выключения питания. По умолчанию оба выключены.
+Отдельная кнопка сохраняет только терминаторы; выходы ленты и параметры PHY/индикации
+не перенастраиваются. У остальных трёх моделей этих элементов управления нет.
+
+В `cfg.json` настройка хранится как `saulux.rs485Term:[true,false]` — сначала
+первый порт, затем второй. В `/json/info` выбранные состояния доступны в
+`wbMgu.rs485Term`. Обновление индикаторов не сбрасывает терминаторы, а после
+ошибки I²C применяется последняя выбранная комбинация. GPIO4 и GPIO15 продолжают
+удерживаться в HIGH; состояния подтяжек RS-485, Vout и сброса MIO не меняются.
+Распиновка терминаторов соответствует
+[основной прошивке Wiren Board](https://github.com/wirenboard/wb-mge/blob/main/main/rs485_control.c).
+
 ### Логика входов и реле
 
 Начальный тип входов — **кнопка без фиксации**, активный уровень **LOW**, внутренние подтяжки включены.
@@ -168,14 +189,14 @@ ESP32-WROOM нельзя. Уровни GPIO4/15 при аппаратном сб
 <a name="firmware-files"></a>
 ## 3. Выбор файла прошивки и объёма flash
 
-Пример имён файлов для версии `16.0.1-saulux.15`:
+Пример имён файлов для версии `16.0.1-saulux.16`:
 
 | Модель | Для OTA | Для первой установки через USB / UART |
 | --- | --- | --- |
-| 2I2O | `WLED_16.0.1-saulux.15_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.15_SAULUX_2I2O_factory.bin` |
-| 5I4O | `WLED_16.0.1-saulux.15_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.15_SAULUX_5I4O_factory.bin` |
-| ETHERNET | `WLED_16.0.1-saulux.15_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.15_SAULUX_ETHERNET_factory.bin` |
-| WB-MGU | `WLED_16.0.1-saulux.15_WB_MGU.bin` | `WLED_16.0.1-saulux.15_WB_MGU_factory.bin` |
+| 2I2O | `WLED_16.0.1-saulux.16_SAULUX_2I2O.bin` | `WLED_16.0.1-saulux.16_SAULUX_2I2O_factory.bin` |
+| 5I4O | `WLED_16.0.1-saulux.16_SAULUX_5I4O.bin` | `WLED_16.0.1-saulux.16_SAULUX_5I4O_factory.bin` |
+| ETHERNET | `WLED_16.0.1-saulux.16_SAULUX_ETHERNET.bin` | `WLED_16.0.1-saulux.16_SAULUX_ETHERNET_factory.bin` |
+| WB-MGU | `WLED_16.0.1-saulux.16_WB_MGU.bin` | `WLED_16.0.1-saulux.16_WB_MGU_factory.bin` |
 
 В релизе находятся **четыре варианта прошивки**, каждый в обычном и factory-исполнении,
 а также `SHA256SUMS` и `manifest.json`.
@@ -216,7 +237,7 @@ ESP32-WROOM нельзя. Уровни GPIO4/15 при аппаратном сб
 Пример для SAULUX ETHERNET и современного `esptool`:
 
 ```sh
-python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.15_SAULUX_ETHERNET_factory.bin
+python3 -m esptool --chip esp32 --port /dev/cu.usbserial-EXAMPLE write-flash 0x0 WLED_16.0.1-saulux.16_SAULUX_ETHERNET_factory.bin
 ```
 
 Замените порт и имя файла. В Linux порт может иметь вид `/dev/ttyUSB0`, в Windows — `COM4`.
@@ -1049,9 +1070,9 @@ pio run -e saulux_ethernet
 затем подготовьте версию пакета и соберите интерфейс до прошивки:
 
 ```sh
-git checkout saulux-v16.0.1-saulux.15
+git checkout saulux-v16.0.1-saulux.16
 npm ci
-python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.15
+python3 tools/saulux_release.py prepare saulux-v16.0.1-saulux.16
 npm run build
 pio run
 ```
@@ -1073,23 +1094,23 @@ pio run -e esp32dev
 
 ### Выпуск через GitHub Actions
 
-Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.15`.
+Для этого форка используются теги `saulux-v...`, например `saulux-v16.0.1-saulux.16`.
 Тег должен соответствовать базовой версии исходников; новую версию выпускают новым тегом.
 
 Порядок выпуска следующей версии:
 
 1. Сохраните и отправьте изменения в свой репозиторий.
-2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.16`, и отправьте его.
+2. Создайте новый тег с новым номером, например `saulux-v16.0.1-saulux.17`, и отправьте его.
 3. Дождитесь успешного workflow **SAULUX Release**.
 4. Проверьте четыре OTA-файла, четыре factory-файла и `SHA256SUMS` в Releases.
 5. Дождитесь успешного развёртывания Pages и проверьте `manifest.json`.
 
-Пример команд для будущей версии `.16`, если её тег ещё не существует:
+Пример команд для будущей версии `.17`, если её тег ещё не существует:
 
 ```sh
 git push origin main
-git tag saulux-v16.0.1-saulux.16
-git push origin saulux-v16.0.1-saulux.16
+git tag saulux-v16.0.1-saulux.17
+git push origin saulux-v16.0.1-saulux.17
 ```
 
 Если запуск по тегу не произошёл, используйте **Actions → SAULUX Release → Run workflow**

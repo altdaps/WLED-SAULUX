@@ -30,6 +30,10 @@ void reserveWbMguPins();
 void setupWbMgu();
 void handleWbMgu();
 void addWbMguInfo(JsonObject root);
+uint8_t getWbMguTerminators();
+bool configureWbMguTerminators(bool port1, bool port2);
+void readWbMguConfig(JsonObject config);
+void serializeWbMguConfig(JsonObject config);
 #endif
 #ifndef WLED_DISABLE_MQTT
 void onSauluxMqttConnect();

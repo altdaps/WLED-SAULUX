@@ -110,6 +110,7 @@ bool prepareSauluxConfig(JsonObject root) {
   statusInverted = root["saulux"]["statusInverted"] | false;
   const int applied = root["saulux"]["applied"] | -1;
 #if SAULUX_MODEL == 4
+  readWbMguConfig(root["saulux"].as<JsonObject>());
   reserveWbMguPins();
 #endif
   const auto& profile = PROFILES[SAULUX_MODEL - 1];
@@ -171,6 +172,9 @@ void serializeSauluxConfig(JsonObject root) {
   config["phyAddress"] = phyAddress;
   config["statusInverted"] = statusInverted;
   config["ledDefaults"] = LED_DEFAULTS_VERSION;
+#if SAULUX_MODEL == 4
+  serializeWbMguConfig(config);
+#endif
 }
 
 void setupSauluxStatus() {

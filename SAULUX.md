@@ -5,7 +5,7 @@
 The firmware base is the official **WLED v16.0.1** tag
 (`29b389df1c1aaec6ff53aea742d17063b985906c`), with its ESP-IDF 4.4 / Arduino 2
 platform. SAULUX features are ported onto that source; WLED 17 development changes
-are not included. Fork releases use versions such as `16.0.1-saulux.15`.
+are not included. Fork releases use versions such as `16.0.1-saulux.16`.
 
 This fork builds firmware for ESP32-WROOM-32 modules with **4 MB or 8 MB flash and
 no PSRAM**, and for WB-MGE v.3 hardware (ESP32-U4WDH, 4 MB, no PSRAM). All variants share a **4 MB flash layout** so the
@@ -46,7 +46,8 @@ The ESP32-U4WDH package exposes GPIO10; it must not be used on ordinary WROOM bo
   and the usual ESP32 RMII pins. The web settings use ETH-KIT wiring with the RTL8201 driver.
 - TCA9535/TCA9555: address `0x20`, SDA32/SCL33, dedicated I2C controller 1.
   Its GPIOs are reserved from LED/button/relay allocation.
-- P00/P01 terminators and P02/P03 failsafe bias stay LOW/OFF. Vout P06 stays OFF.
+- P00/P01 terminators default LOW/OFF and are individually configurable.
+  P02/P03 failsafe bias and Vout P06 stay OFF.
 - MIO reset is **P10 = port 1 bit 0 = linear bit 8**, held LOW/OFF following the
   [production MIO driver](https://github.com/wirenboard/wb-mge/blob/main/main/mio_control.c).
   The older ESPHome demo uses the wrong linear bit 10; the wiki's reset polarity
@@ -56,6 +57,17 @@ The ESP32-U4WDH package exposes GPIO10; it must not be used on ordinary WROOM bo
   Status uses the SAULUX network heartbeat. Link LEDs show Wi-Fi/AP and Ethernet link state.
 - A failed expander transaction is retried at most once per second; `/json/info`
   reports initialization status in `wbMgu.expanderReady` and `controlPinsReady`.
+
+Only this profile shows **WB-MGE RS-485** in **Config → LED & Hardware → SAULUX device**.
+Set **RS-485 port 1 terminator** and **RS-485 port 2 terminator**, then click
+**Save terminators**. The settings apply from the main loop without a reboot and
+persist as `saulux.rs485Term:[port1,port2]` in `cfg.json`. The same desired pair is
+reported as `wbMgu.rs485Term` in `/json/info`. Missing settings default OFF.
+The separate form leaves LED layout, PHY/status options and preset assignments intact.
+Other hardware variants do not expose or accept this control. If I2C fails, recovery
+applies the most recently saved choice. Wi-Fi/Ethernet/Status LED updates preserve
+both terminator bits. Wiring follows the
+[production RS-485 driver](https://github.com/wirenboard/wb-mge/blob/main/main/rs485_control.c).
 
 The RS-485 transceivers remain differential A/B line drivers; an ordinary LED DIN
 requires the appropriate receiving/level-conversion circuit. Modbus and the internal
@@ -353,11 +365,11 @@ See [Espressif bootloader compatibility](https://docs.espressif.com/projects/esp
 3. Commit the source and push a release tag, for example:
 
    ```sh
-   git tag saulux-v16.0.1-saulux.15
-   git push origin saulux-v16.0.1-saulux.15
+   git tag saulux-v16.0.1-saulux.16
+   git push origin saulux-v16.0.1-saulux.16
    ```
 
-The tag suffix (`16.0.1-saulux.15` here) becomes the firmware and asset version.
+The tag suffix (`16.0.1-saulux.16` here) becomes the firmware and asset version.
 If a tag push does not start a run, use **Actions → SAULUX Release → Run workflow**
 on `main` and enter the existing tag. Manual runs build the exact tagged source.
 Use a new, increasing version for each release. The workflow compiles and tests the

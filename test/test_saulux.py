@@ -16,6 +16,16 @@ release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
 
+def write_terminator_dispatch(temp):
+    """Compile the real settings-form guard, including unsupported-model handling."""
+    source = (ROOT / "wled00/set.cpp").read_text()
+    start = source.index("    // The WB-MGE terminator form")
+    guard = source[start:source.index("    // AI: end", start)]
+    (temp / "wb_mgu_dispatch.cpp").write_text(
+        "void dispatchTerminators(const TestRequest& input) { const auto* request = &input;\n"
+        + guard + "\n++genericLedUpdates; }\n")
+
+
 class TimezoneTests(unittest.TestCase):
     def test_city_offsets_and_existing_menu_ids(self):
         """Run the firmware's table through its bundled converter across whole years."""
@@ -116,6 +126,7 @@ class ProfileTests(unittest.TestCase):
         self.assertIsNotNone(compiler)
         with tempfile.TemporaryDirectory() as folder:
             temp = Path(folder)
+            write_terminator_dispatch(temp)
             source = (ROOT / "wled00/saulux_wb_mgu.cpp").read_text()
             (temp / "wb_mgu_runtime.cpp").write_text(source.replace('#include "wled.h"', '#include "wb_mgu_shim.h"'))
             binary = temp / "board"
@@ -124,6 +135,22 @@ class ProfileTests(unittest.TestCase):
                             "-I" + str(ROOT / "wled00"), str(ROOT / "test/saulux/wb_mgu_native.cpp"),
                             "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
+
+    def test_terminators_rejected_on_other_boards(self):
+        """Unsupported settings forms must never reach generic GPIO reconfiguration."""
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as folder:
+            temp = Path(folder)
+            write_terminator_dispatch(temp)
+            for model in range(4):
+                binary = temp / f"unsupported-{model}"
+                flags = [f"-DSAULUX_MODEL={model}"] + (["-DSAULUX"] if model else [])
+                subprocess.run([compiler, "-std=c++17", *flags, "-I" + str(temp),
+                                "-I" + str(ROOT / "test/saulux"), "-I" + str(ROOT / "wled00"),
+                                str(ROOT / "test/saulux/wb_mgu_http_native.cpp"),
+                                "-o", str(binary)], check=True)
+                subprocess.run([str(binary)], check=True)
 
     def test_native_ota_validation(self):
         compiler = shutil.which("clang++") or shutil.which("g++")

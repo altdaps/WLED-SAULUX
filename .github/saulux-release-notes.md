@@ -2,6 +2,13 @@ SAULUX firmware based on the official **WLED 16.0.1** source, with its ESP-IDF 4
 
 Four fixed hardware variants: **SAULUX 2I2O**, **SAULUX 5I4O**, **SAULUX ETHERNET** and **WB-MGU**. Each has an ordinary OTA `.bin` and a corresponding `_factory.bin` for serial flashing. The web interface shows the installed model without a model selector.
 
+**WB-MGE terminator controls:** only the WB-MGU/WB-MGE v.3 profile exposes
+independent port 1/port 2 terminator switches in LED & Hardware. A separate
+**Save terminators** button persists and applies the choice without rebooting
+or changing LED/PHY settings. Defaults remain OFF. State updates run on the main
+loop and survive LED heartbeat changes, power cycles and I2C recovery. Other
+firmware variants hide the controls and ignore requests for this form.
+
 **Three built-in line presets on every model:** `Line START`, `Line END` and
 `Line CENTER` appear automatically at boot. Each uses segment 0, white startup,
 live color controls and a one-second full pass; repeated calls reverse/toggle it.
@@ -12,7 +19,8 @@ at the next boot. Full or corrupt files are not overwritten.
 **New WB-MGU build (WB-MGE v.3 pinout):** LED outputs GPIO10/14, permanently
 asserted transmit enables GPIO4/15, RTL8201 Ethernet at address 0, and a reserved
 TCA9535 bus on SDA32/SCL33. MIO reset uses P10/linear bit 8 and the production
-firmware's LOW polarity; terminators, failsafe bias and Vout stay disabled.
+firmware's LOW polarity; terminators default OFF and are now configurable,
+while failsafe bias and Vout stay disabled.
 Config button GPIO34 and Wi-Fi/Ethernet/Status indicators are supported.
 The different WB-MGU v.1/WBE2 hardware is not targeted. First installation from
 another WLED build initializes two 30-pixel SK6812 RGBW outputs; reconfigure

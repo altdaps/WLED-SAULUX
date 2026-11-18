@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include "wb_mgu_runtime.cpp"
+#include "wb_mgu_dispatch.cpp"
 
 // Verify pin ownership, register polarity/order and bounded retries using the
 // actual board implementation; writes to unrelated expander bits must not occur.
@@ -47,6 +48,50 @@ int main() {
   DynamicJsonDocument doc(512);
   addWbMguInfo(doc.to<JsonObject>());
   assert(doc["wbMgu"]["expanderReady"] == true && doc["wbMgu"]["mioResetBit"] == 8);
+  testStatusInverted = false;
+  // HTTP changes queue a coherent mask. The main loop alone performs I2C writes.
+  const auto beforeHttp = boardWire.transactions.size();
+  configNeedsWrite = false;
+  dispatchTerminators({{{"WBTP", "1"}, {"WBT1", "1"}, {"WBT2", "1"}, {"L00", "4"}}});
+  assert(configNeedsWrite && getWbMguTerminators() == 3 && !genericLedUpdates);
+  assert(boardWire.transactions.size() == beforeHttp);
+  handleWbMgu(); assert((boardWire.registers[2] & 3) == 3);
+  configNeedsWrite = false;
+  dispatchTerminators({{{"WBTP", "1"}, {"WBT1", "1"}, {"WBT2", "1"}}});
+  assert(!configNeedsWrite);
+  for (const auto& fields : std::vector<std::map<std::string,std::string>>{
+      {{"WBTP", "0"}}, {{"WBTP", "1"}, {"WBT1", "on"}}, {{"WBTP", "1"}, {"WBT2", "0"}}}) {
+    dispatchTerminators({fields});
+    assert(!configNeedsWrite && getWbMguTerminators() == 3 && !genericLedUpdates);
+  }
+  dispatchTerminators({{{"WBTP", "1"}}});
+  assert(configNeedsWrite && !getWbMguTerminators());
+  dispatchTerminators({{{"L00", "10"}}}); assert(genericLedUpdates == 1);
+  for (uint8_t mask = 0; mask < 4; ++mask) {
+    configureWbMguTerminators(mask & 1, mask & 2);
+    handleWbMgu();
+    assert((boardWire.registers[2] & 3) == mask);
+    assert((boardWire.registers[2] & 0x4C) == 0); // bias and Vout remain OFF
+    assert(boardWire.registers[3] == 0 && levels[4] == HIGH && levels[15] == HIGH);
+    doc.clear(); serializeWbMguConfig(doc.to<JsonObject>());
+    assert(doc["rs485Term"][0].is<bool>() && doc["rs485Term"][1].is<bool>());
+    configureWbMguTerminators(false, false);
+    readWbMguConfig(doc.as<JsonObject>());
+    setupWbMgu();
+    assert(getWbMguTerminators() == mask && (boardWire.registers[2] & 3) == mask);
+  }
+  doc.clear(); doc["rs485Term"][0] = 1; doc["rs485Term"][1] = "true";
+  readWbMguConfig(doc.as<JsonObject>()); assert(!getWbMguTerminators());
+  handleWbMgu();
+  boardWire.accepting = false;
+  configureWbMguTerminators(true, true); handleWbMgu(); assert(!expanderReady);
+  configureWbMguTerminators(false, true); // the latest choice must survive I2C failure
+  boardWire.accepting = true; tick += RETRY_MS; handleWbMgu();
+  assert(expanderReady && (boardWire.registers[2] & 3) == 2);
+  Network.connected = true; ETH.linked = true; tick += 500; handleWbMgu();
+  assert((boardWire.registers[2] & 3) == 2 && !(boardWire.registers[2] & 0x4C));
+  doc.clear(); addWbMguInfo(doc.to<JsonObject>());
+  assert(doc["wbMgu"]["rs485Term"][0] == false && doc["wbMgu"]["rs485Term"][1] == true);
   std::cout << "WB-MGU fixed enables, TCA9535 sequencing, MIO reset and retry checks passed\n";
 }
 // AI: end
